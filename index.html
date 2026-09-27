@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>箕面船場 打席予約</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#EEF2EE; --surface:#FFFFFF; --surface2:#F5F8F5; --ink:#15201A; --muted:#5B6A62; --line:#D5DED8;
+  --accent:#1D6A48; --accent-ink:#FFFFFF; --accent-soft:#D7ECE0;
+  --peak:#A8661A; --peak-soft:#F7E6CC; --low:#3E6C95; --low-soft:#E1EAF3;
+  --taken:#C3CCC6; --bad:#B03838; --bad-soft:#F6DEDE;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F1512; --surface:#17201B; --surface2:#1C2621; --ink:#E3EBE6; --muted:#93A39A; --line:#2A3630;
+    --accent:#5CC393; --accent-ink:#0F1512; --accent-soft:#1E3A2D;
+    --peak:#E5A84F; --peak-soft:#3A2B15; --low:#86B3DB; --low-soft:#1B2A37;
+    --taken:#3A4640; --bad:#E47D7D; --bad-soft:#3A1E1E;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F1512; --surface:#17201B; --surface2:#1C2621; --ink:#E3EBE6; --muted:#93A39A; --line:#2A3630;
+  --accent:#5CC393; --accent-ink:#0F1512; --accent-soft:#1E3A2D;
+  --peak:#E5A84F; --peak-soft:#3A2B15; --low:#86B3DB; --low-soft:#1B2A37;
+  --taken:#3A4640; --bad:#E47D7D; --bad-soft:#3A1E1E;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;font-size:14px;line-height:1.6;padding:0 16px;padding-block:18px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.num{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand small{font-size:11px;letter-spacing:.18em;color:var(--muted)}
+.brand h1{font-family:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;font-weight:400;font-size:26px;margin:0;letter-spacing:.02em;line-height:1.2;text-wrap:balance}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.chip.on i{background:var(--accent)}
+
+.layout{display:grid;grid-template-columns:1fr;gap:18px;align-items:start}
+@media (min-width:960px){.layout{grid-template-columns:minmax(0,1fr) 360px}.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}}
+main,.side{display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+h2{font-size:15px;margin:0;letter-spacing:.04em}
+.phead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.note{font-size:12px;color:var(--muted);margin:10px 0 0}
+
+/* dates */
+.dates{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.date{flex:0 0 auto;width:62px;border:1px solid var(--line);background:var(--surface2);border-radius:10px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:0;cursor:pointer}
+.date .w{font-size:11px;color:var(--muted)}
+.date .d{font-size:17px;font-weight:700;line-height:1.3}
+.date .a{font-size:10.5px;color:var(--muted)}
+.date.pk .w{color:var(--peak);font-weight:700}
+.date[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.date[aria-selected="true"] .w,.date[aria-selected="true"] .a{color:var(--accent-ink)}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px;border:1px solid var(--line)}
+
+/* grid */
+.gridwrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:340px}
+.grid th{position:sticky;top:0;z-index:2;background:var(--surface);font-size:11.5px;font-weight:700;padding:8px 2px;border-bottom:1px solid var(--line);color:var(--muted)}
+.grid th.bay{color:var(--ink)}
+.grid td{padding:2px;border-top:1px solid transparent}
+.grid tr.hr td{border-top-color:var(--line)}
+.grid td.t{font-size:11.5px;width:48px;text-align:right;padding-right:6px;color:var(--muted);white-space:nowrap}
+.grid tr.hr td.t{color:var(--ink)}
+.grid td.p{font-size:11px;width:44px;color:var(--low)}
+.grid td.p.pk{color:var(--peak);font-weight:700}
+.cell{display:block;width:100%;height:26px;border:0;border-radius:4px;cursor:pointer;background:var(--low-soft);position:relative;font-size:10.5px;padding:0}
+.cell.pk{background:var(--peak-soft)}
+.cell:hover:not(:disabled){box-shadow:inset 0 0 0 2px var(--accent)}
+.cell.taken{background:repeating-linear-gradient(135deg,var(--taken) 0 4px,transparent 4px 8px);cursor:not-allowed}
+.cell.mine{background:var(--accent);color:var(--accent-ink);cursor:default;font-weight:700}
+.cell.past{opacity:.35;cursor:not-allowed}
+.cell.sel{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent);color:var(--accent);font-weight:700}
+.grid td.closed{text-align:center;font-size:11.5px;color:var(--muted);background:repeating-linear-gradient(45deg,var(--line) 0 3px,transparent 3px 7px);border-radius:4px}
+
+/* booking panel */
+.sel-sum{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin:0 0 12px}
+.sel-sum dt{color:var(--muted)}
+.sel-sum dd{margin:0;font-weight:700}
+.lens{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
+.lens button{border:1px solid var(--line);background:var(--surface2);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12.5px}
+.lens button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.lens button:disabled{opacity:.35;cursor:not-allowed}
+.lbl{font-size:12px;color:var(--muted)}
+table.bd{width:100%;border-collapse:collapse;font-size:13px}
+.bd td{padding:5px 0;border-bottom:1px solid var(--line)}
+.bd td:last-child{text-align:right}
+.bd tr.minus td:last-child{color:var(--accent)}
+.bd tr.tot td{border-bottom:0;font-weight:700;font-size:16px;padding-top:10px}
+.field{display:flex;flex-direction:column;gap:4px;margin-top:12px}
+.field input[type=text]{border:1px solid var(--line);background:var(--surface2);border-radius:8px;padding:8px 10px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin-top:10px}
+.check input{margin-top:4px;accent-color:var(--accent)}
+.btn{display:block;width:100%;margin-top:14px;border:0;border-radius:10px;padding:12px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:15px;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.err{background:var(--bad-soft);color:var(--bad);border-radius:8px;padding:8px 10px;font-size:12.5px;margin-top:10px}
+.empty{color:var(--muted);font-size:13px;margin:0}
+.done{text-align:center}
+.done .code{font-size:34px;letter-spacing:.25em;font-weight:700;margin:6px 0 2px;color:var(--accent)}
+
+/* member */
+.meter{height:8px;border-radius:4px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;margin:8px 0 4px}
+.meter i{display:block;height:100%;background:var(--accent)}
+.kv{display:flex;justify-content:space-between;font-size:13px}
+.perks{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+.perks li{margin:2px 0}
+
+/* my bookings */
+.mylist{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.mylist li{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px}
+.mylist .when{font-weight:700}
+.mylist .meta{color:var(--muted);font-size:12px}
+.mylist .code{grid-row:1/3;grid-column:2;text-align:right;font-size:12px;color:var(--muted)}
+.mylist .code b{display:block;font-size:17px;color:var(--ink);letter-spacing:.1em}
+.mylist .acts{grid-column:1/3;display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.sm{border:1px solid var(--line);background:var(--surface2);border-radius:7px;padding:3px 10px;font-size:12px;cursor:pointer}
+.sm.danger{border-color:var(--bad);color:var(--bad);background:transparent}
+
+/* guide */
+table.price{width:100%;border-collapse:collapse;font-size:13px}
+.price th,.price td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+.price th{font-size:12px;color:var(--muted);font-weight:500}
+.price td:last-child,.price th:last-child{text-align:right}
+.tag{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:4px;margin-left:6px;vertical-align:1px}
+.tag.pk{background:var(--peak-soft);color:var(--peak)}
+.rules{margin:14px 0 0;padding-left:18px;font-size:13px}
+.rules li{margin:4px 0}
+.guide-grid{display:grid;grid-template-columns:1fr;gap:18px}
+@media (min-width:720px){.guide-grid{grid-template-columns:1fr 1fr}}
+.tscroll{overflow-x:auto}
+
+.owner-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.owner-kpi div{background:var(--surface2);border-radius:8px;padding:8px 10px}
+.owner-kpi span{display:block;font-size:11px;color:var(--muted)}
+.owner-kpi b{font-size:17px}
+.demo{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:10px 14px;margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <small>MINOH SEMBA · 24H SELF BAYS</small>
+      <h1>箕面船場 <span>24h</span> 打席予約</h1>
+      <p>全5打席・24時間無人営業・30分単位でWeb予約。月会費1,500円はその月の利用料に充当されます。</p>
+    </div>
+    <span class="chip" id="mode-chip"><i></i><span id="mode-t">プレビュー（サンプル表示）</span></span>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section class="panel" aria-labelledby="h-sch">
+        <div class="phead">
+          <h2 id="h-sch">空き状況</h2>
+          <div class="legend">
+            <span><i style="background:var(--low-soft)"></i>¥500</span>
+            <span><i style="background:var(--peak-soft)"></i>¥700（ピーク）</span>
+            <span><i style="background:repeating-linear-gradient(135deg,var(--taken) 0 3px,transparent 3px 6px)"></i>予約済</span>
+            <span><i style="background:var(--accent)"></i>あなたの予約</span>
+          </div>
+        </div>
+        <div class="dates" id="dates" role="tablist" aria-label="日付"></div>
+        <div class="gridwrap" id="gridwrap"><table class="grid" id="grid"></table></div>
+        <p class="note" id="daynote"></p>
+      </section>
+
+      <section class="panel" id="owner" hidden aria-labelledby="h-own">
+        <div class="phead"><h2 id="h-own">オーナー表示：この日の予約</h2><span class="lbl">オーナーにだけ表示されます</span></div>
+        <div id="owner-body"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-guide">
+        <div class="phead"><h2 id="h-guide">料金とご利用案内</h2><span class="lbl">料金はすべて税込・1打席30分あたり</span></div>
+        <div class="guide-grid">
+          <div class="tscroll">
+            <table class="price">
+              <thead><tr><th>時間帯</th><th>時間</th><th>30分</th></tr></thead>
+              <tbody>
+                <tr><td>平日夜<span class="tag pk">ピーク</span></td><td class="num">17:00–24:00</td><td class="num">¥700</td></tr>
+                <tr><td>土日祝<span class="tag pk">ピーク</span></td><td class="num">6:00–24:00</td><td class="num">¥700</td></tr>
+                <tr><td>平日昼</td><td class="num">9:00–17:00</td><td class="num">¥500</td></tr>
+                <tr><td>早朝（平日）</td><td class="num">6:00–9:00</td><td class="num">¥500</td></tr>
+                <tr><td>深夜</td><td class="num">0:00–3:00 / 5:00–6:00</td><td class="num">¥500</td></tr>
+                <tr><td>清掃・メンテナンス</td><td class="num">3:00–5:00</td><td>利用不可</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul class="rules">
+            <li><b>月会費1,500円</b>は、その月の利用料から自動で差し引かれます。利用が1,500円に届かない月も会費は1,500円です。</li>
+            <li><b>入会月の月会費は0円</b>：会費の充当は翌月から始まります（入会月の利用料はそのままお支払いいただきます）。</li>
+            <li>ご予約には<b>会員登録</b>（氏名・電話番号・メールアドレス）が必要です。</li>
+            <li><b>直前割20%オフ</b>：開始3時間前を切ってからのご予約に適用されます。</li>
+            <li>ご予約は30分単位・最大3時間・14日先まで。キャンセルは開始時刻まで無料です。</li>
+            <li>入室は、予約完了時に表示される4桁のコードで行います。</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <aside class="side">
+      <section class="panel" id="book" aria-labelledby="h-book" aria-live="polite"></section>
+      <section class="panel" id="member" aria-labelledby="h-mem"></section>
+      <section class="panel" id="mine" aria-labelledby="h-mine"></section>
+    </aside>
+  </div>
+
+  <p class="demo">試作版です。決済、スマートロック、本人確認はまだつながっていません。「お支払い」は表示だけで、入室コードは画面上のサンプルです。</p>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const yen=v=>"¥"+Math.round(v).toLocaleString("ja-JP");
+const pad=n=>String(n).padStart(2,"0");
+const dstr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseD=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);};
+const tl=s=>`${Math.floor(s/2)}:${s%2?"30":"00"}`;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const WD="日月火水木金土";
+const BAYS=5,MAXLEN=6,AHEAD=14,FEE=1500,LASTMIN_H=3,LASTMIN_RATE=.2,OPEN_SLOTS=44;
+// 国民の祝日（2026年9月〜2027年3月）
+const HOL=new Set(["2026-09-21","2026-09-22","2026-09-23","2026-10-12","2026-11-03","2026-11-23",
+  "2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-22"]);
+
+const isPeakDay=ds=>{const w=parseD(ds).getDay();return w===0||w===6||HOL.has(ds);};
+function bandOf(ds,s){const h=s>>1;
+  if(h>=3&&h<5)return null;
+  if(h<6)return{n:"深夜",p:500,pk:false};
+  if(isPeakDay(ds))return{n:"土日祝",p:700,pk:true};
+  if(h<9)return{n:"早朝",p:500,pk:false};
+  if(h<17)return{n:"平日昼",p:500,pk:false};
+  return{n:"平日夜",p:700,pk:true};}
+const slotTime=(ds,s)=>{const d=parseD(ds);d.setMinutes(s*30);return d;};
+const key=(bay,s)=>bay+"_"+s;
+
+// ---------- state ----------
+const S={days:{},date:dstr(new Date()),sel:null,len:2,done:null,err:"",busy:false,cancelAsk:null,
+  mode:"local",uid:null,profile:null,isOwner:false,readOnly:false,members:[],reg:{},regErr:"",regBusy:false};
+let db=null,profileRef=null;
+const mem={};
+
+function lsGet(k){try{return localStorage.getItem(k);}catch{return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch{}}
+S.uid=lsGet("minoh-uid")||("local-"+Math.random().toString(36).slice(2,10));lsSet("minoh-uid",S.uid);
+try{S.profile=JSON.parse(lsGet("minoh-profile")||"null");}catch{S.profile=null;}
+
+// サンプル予約（プレビュー時のみ。共有データには書き込まない）
+(function seed(){const t=new Date();const d=i=>dstr(new Date(t.getFullYear(),t.getMonth(),t.getDate()+i));
+  const add=(ds,bay,s,len)=>{const bid="sample"+bay+s+ds.slice(-2);mem[ds]??={date:ds,slots:{},bookings:{}};
+    for(let i=0;i<len;i++)mem[ds].slots[key(bay,s+i)]=bid;
+    mem[ds].bookings[bid]={bay,start:s,len,name:"サンプル",by:"sample",status:"active",pay:0,gross:0};};
+  add(d(0),1,38,2);add(d(0),2,40,3);add(d(0),4,42,2);add(d(0),5,14,2);
+  add(d(1),1,36,4);add(d(1),3,20,2);add(d(1),5,42,2);add(d(2),2,38,2);add(d(2),3,38,2);
+  S.days={...mem};})();
+
+// ---------- data access ----------
+async function storeBook(ds,keys,bid,rec){
+  if(S.mode==="local"){const d=mem[ds]??={date:ds,slots:{},bookings:{}};
+    if(keys.some(k=>d.slots[k]))throw{code:"taken"};
+    keys.forEach(k=>d.slots[k]=bid);d.bookings[bid]=rec;S.days={...mem};return;}
+  const ref=db.doc("days/"+ds);
+  let ok=false;
+  for(let i=0;i<10&&!ok;i++){const r=await ref.acquire({holder:bid,ttlMs:8000});ok=r.acquired;if(!ok)await sleep(300+Math.random()*500);}
+  if(!ok)throw{code:"busy"};
+  const snap=await ref.get();const cur=snap.exists?snap.data():null;
+  if(keys.some(k=>cur?.slots?.[k]))throw{code:"taken"};
+  const patch={slots:Object.fromEntries(keys.map(k=>[k,bid])),bookings:{[bid]:rec}};
+  if(cur&&cur.slots)await ref.update(patch);
+  else await ref.set({date:ds,...patch});
+}
+async function storeCancel(ds,bid,keys){
+  const at=new Date().toISOString();
+  if(S.mode==="local"){const d=mem[ds];keys.forEach(k=>{if(d.slots[k]===bid)d.slots[k]=null;});
+    Object.assign(d.bookings[bid],{status:"cancelled",cancelledAt:at});S.days={...mem};return;}
+  await db.doc("days/"+ds).update({slots:Object.fromEntries(keys.map(k=>[k,null])),bookings:{[bid]:{status:"cancelled",cancelledAt:at}}});
+}
+async function saveProfile(){
+  if(profileRef)await profileRef.set(S.profile);
+  else lsSet("minoh-profile",JSON.stringify(S.profile));
+}
+
+// ---------- calculations ----------
+const taken=(ds,bay,s)=>S.days[ds]?.slots?.[key(bay,s)]||null;
+const isPast=(ds,s)=>slotTime(ds,s)<=new Date();
+function maxLen(ds,bay,s){let n=0;while(n<MAXLEN&&s+n<48&&bandOf(ds,s+n)&&!taken(ds,bay,s+n)&&!isPast(ds,s+n))n++;return n;}
+function usedCredit(month){return S.profile?.credit?.[month]||0;}
+const joinMonth=()=>(S.profile?.joinedAt?dstr(new Date(S.profile.joinedAt)):dstr(new Date())).slice(0,7);
+// 入会月は会費0円 → 充当枠も0円。翌月から毎月1,500円
+const feeFor=month=>month<=joinMonth()?0:FEE;
+function quote(ds,s,len){
+  const units=Array.from({length:len},(_,i)=>bandOf(ds,s+i).p);
+  const gross=units.reduce((a,b)=>a+b,0);
+  const lead=(slotTime(ds,s)-new Date())/36e5;
+  const disc=lead<=LASTMIN_H?Math.floor(gross*LASTMIN_RATE/10)*10:0;
+  const after=gross-disc, month=ds.slice(0,7), fee=feeFor(month);
+  const remain=Math.max(0,fee-usedCredit(month));
+  const credit=Math.min(remain,after);
+  return{units,gross,disc,after,credit,remain,fee,pay:after-credit,month};
+}
+function dayStats(ds){let free=0,booked=0,rev=0;
+  for(let b=1;b<=BAYS;b++)for(let s=0;s<48;s++){if(!bandOf(ds,s))continue;
+    if(taken(ds,b,s))booked++;else if(!isPast(ds,s))free++;}
+  Object.values(S.days[ds]?.bookings||{}).forEach(x=>{if(x.status==="active")rev+=(x.gross||0)-(x.disc||0);});
+  return{free,booked,rev,util:booked/(OPEN_SLOTS*BAYS)};}
+
+// ---------- render ----------
+function renderDates(){
+  const t=new Date();let h="";
+  for(let i=0;i<AHEAD;i++){const d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+i),ds=dstr(d);
+    const pk=isPeakDay(ds),st=dayStats(ds),w=i===0?"今日":WD[d.getDay()]+(HOL.has(ds)?"・祝":"");
+    h+=`<button class="date${pk?" pk":""}" role="tab" id="dt-${ds}" aria-selected="${ds===S.date}" data-ds="${ds}">
+      <span class="w">${w}</span><span class="d num">${d.getMonth()+1}/${d.getDate()}</span><span class="a">空き${st.free}</span></button>`;}
+  $("dates").innerHTML=h;
+}
+function renderGrid(){
+  const ds=S.date;let h=`<thead><tr><th>時刻</th><th>30分</th>${Array.from({length:BAYS},(_,i)=>`<th class="bay">${i+1}番</th>`).join("")}</tr></thead><tbody>`;
+  let closedDone=false;
+  for(let s=0;s<48;s++){const b=bandOf(ds,s),hr=s%2===0?" hr":"";
+    if(!b){if(closedDone)continue;closedDone=true;
+      h+=`<tr class="hr" id="row-${s}"><td class="t num">3:00</td><td class="p"></td><td class="closed" colspan="${BAYS}">3:00–5:00 清掃・メンテナンス</td></tr>`;continue;}
+    h+=`<tr class="${hr}" id="row-${s}"><td class="t num">${s%2?"":tl(s)}</td><td class="p num${b.pk?" pk":""}">${s%2?"":"¥"+b.p}</td>`;
+    for(let bay=1;bay<=BAYS;bay++){
+      const bid=taken(ds,bay,s),bk=bid&&S.days[ds].bookings?.[bid];
+      const mine=bk&&bk.by===S.uid;
+      const sel=S.sel&&S.sel.ds===ds&&S.sel.bay===bay&&s>=S.sel.s&&s<S.sel.s+S.len;
+      const past=!bid&&isPast(ds,s);
+      let cls="cell"+(b.pk?" pk":""),dis="",txt="",lab=`${bay}番 ${tl(s)} ¥${b.p}`;
+      if(mine){cls+=" mine";dis="disabled";txt=s===bk.start?"予約":"";lab+=" あなたの予約";}
+      else if(bid){cls+=" taken";dis="disabled";lab+=" 予約済";}
+      else if(past){cls+=" past";dis="disabled";lab+=" 受付終了";}
+      else if(sel){cls+=" sel";txt=s===S.sel.s?tl(s):"";lab+=" 選択中";}
+      h+=`<td><button class="${cls} num" ${dis} data-bay="${bay}" data-s="${s}" aria-label="${lab}">${txt}</button></td>`;}
+    h+="</tr>";}
+  $("grid").innerHTML=h+"</tbody>";
+  const st=dayStats(ds),d=parseD(ds);
+  $("daynote").textContent=`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}${HOL.has(ds)?"・祝":""}）${isPeakDay(ds)?"は終日ピーク料金（6:00–24:00）":"は17:00以降がピーク料金"}。予約可能な枠は残り${st.free}枠です。`;
+}
+function renderBook(){
+  const el=$("book");
+  if(S.done){const {ds,rec}=S.done,d=parseD(ds);
+    el.innerHTML=`<div class="done"><h2 id="h-book">ご予約を確定しました</h2>
+      <p class="lbl" style="margin:10px 0 0">入室コード</p><div class="code num">${esc(rec.code)}</div>
+      <p style="margin:4px 0 0">${d.getMonth()+1}/${d.getDate()}（${WD[d.getDay()]}）<span class="num">${tl(rec.start)}–${tl(rec.start+rec.len)}</span>・${rec.bay}番打席</p>
+      <p class="lbl" style="margin:4px 0 0">お支払い <span class="num">${yen(rec.pay)}</span>${rec.credit?`（会費充当 ${yen(rec.credit)}）`:""}</p>
+      <button class="btn ghost" id="again">続けて予約する</button></div>`;
+    return;}
+  if(!S.sel){
+    el.innerHTML=`<h2 id="h-book">ご予約</h2><p class="empty" style="margin-top:10px">空き状況の表から、使いたい打席と開始時刻をタップしてください。</p>
+      <p class="note">例：平日19:00から60分 → ¥1,400。入会翌月からは、月会費1,500円の範囲はお支払い不要です。</p>`;return;}
+  const {ds,bay,s}=S.sel,d=parseD(ds),ml=maxLen(ds,bay,s);
+  if(S.len>ml)S.len=Math.max(1,ml);
+  const q=quote(ds,s,S.len),member=!!S.profile?.member;
+  const lens=Array.from({length:MAXLEN},(_,i)=>i+1).map(n=>`<button data-len="${n}" aria-pressed="${n===S.len}" ${n>ml?"disabled":""}>${n*30}分</button>`).join("");
+  let rows=`<tr><td>利用料（30分×${S.len}）</td><td class="num">${yen(q.gross)}</td></tr>`;
+  if(q.disc)rows+=`<tr class="minus"><td>直前割 20%</td><td class="num">−${yen(q.disc)}</td></tr>`;
+  if(q.credit)rows+=`<tr class="minus"><td>月会費から充当（${+q.month.slice(5)}月の残り${yen(q.remain)}）</td><td class="num">−${yen(q.credit)}</td></tr>`;
+  rows+=`<tr class="tot"><td>お支払い</td><td class="num">${yen(q.pay)}</td></tr>`;
+  const feeNote=q.fee===0?`<p class="note">${+q.month.slice(5)}月は入会月のため月会費0円です（会費の充当はありません）。</p>`:"";
+  el.innerHTML=`<h2 id="h-book">ご予約内容</h2>
+    <dl class="sel-sum" style="margin-top:10px"><dt>日付</dt><dd>${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）</dd>
+      <dt>打席</dt><dd>${bay}番</dd><dt>時間</dt><dd class="num">${tl(s)} – ${tl(s+S.len)}</dd></dl>
+    <span class="lbl">利用時間</span><div class="lens" role="group" aria-label="利用時間">${lens}</div>
+    <table class="bd">${rows}</table>
+    ${feeNote}
+    ${member?"":`<div class="err" style="background:var(--accent-soft);color:var(--ink)">ご予約には会員登録が必要です。<button class="sm" id="go-reg" style="margin-left:6px">会員登録へ</button></div>`}
+    ${S.err?`<div class="err" role="alert">${esc(S.err)}</div>`:""}
+    <button class="btn" id="submit" ${(!member||S.busy||S.readOnly)?"disabled":""}>${S.busy?"予約しています…":"この内容で予約する"}</button>
+    ${S.readOnly?`<p class="note">この画面は閲覧専用のため予約できません。</p>`:""}`;
+}
+function renderMember(){
+  const el=$("member"),p=S.profile;
+  if(!p?.member){
+    const r=S.reg,v=(k)=>esc(r[k]||"");
+    el.innerHTML=`<h2 id="h-mem">会員登録</h2>
+      <ul class="perks"><li>月会費1,500円（税込）は、その月の利用料に自動で充当</li><li><b>入会月の月会費は0円</b>（翌月から1,500円）</li><li>ご予約は会員のみ受け付けています</li></ul>
+      <form id="reg" novalidate>
+        <div class="field"><label class="lbl" for="r-name">氏名</label><input type="text" id="r-name" data-k="name" maxlength="40" autocomplete="name" value="${v("name")}" placeholder="箕面 太郎"></div>
+        <div class="field"><label class="lbl" for="r-kana">フリガナ</label><input type="text" id="r-kana" data-k="kana" maxlength="40" value="${v("kana")}" placeholder="ミノオ タロウ"></div>
+        <div class="field"><label class="lbl" for="r-tel">電話番号</label><input type="text" id="r-tel" data-k="tel" inputmode="tel" maxlength="15" autocomplete="tel" value="${v("tel")}" placeholder="090-1234-5678"></div>
+        <div class="field"><label class="lbl" for="r-mail">メールアドレス</label><input type="text" id="r-mail" data-k="mail" inputmode="email" maxlength="80" autocomplete="email" value="${v("mail")}" placeholder="name@example.com"></div>
+        <label class="check"><input type="checkbox" id="r-agree" data-k="agree" ${r.agree?"checked":""}><span>利用規約に同意し、月会費1,500円（税込・入会月は0円）で会員登録します。</span></label>
+        ${S.regErr?`<div class="err" role="alert">${esc(S.regErr)}</div>`:""}
+        <button class="btn" type="submit" id="r-submit" ${S.regBusy||S.readOnly?"disabled":""}>${S.regBusy?"登録しています…":"会員登録する"}</button>
+      </form>`;return;}
+  const m=dstr(new Date()).slice(0,7),fee=feeFor(m),used=usedCredit(m),rem=Math.max(0,fee-used);
+  const no="M"+String([...S.uid].reduce((a,c)=>(a*31+c.charCodeAt(0))%1e6,7)).padStart(6,"0");
+  const jd=new Date(p.joinedAt);
+  el.innerHTML=`<h2 id="h-mem">${esc(p.name)} さんの会員情報</h2>
+    <div class="kv" style="margin-top:10px"><span class="lbl">会員番号</span><b class="num">${no}</b></div>
+    <div class="kv"><span class="lbl">入会日</span><span class="num">${jd.getFullYear()}/${jd.getMonth()+1}/${jd.getDate()}</span></div>
+    ${fee===0?`<div class="kv" style="margin-top:8px"><span class="lbl">${+m.slice(5)}月の月会費</span><b>0円（入会月）</b></div>
+      <p class="note" style="margin-top:4px">来月から月会費1,500円がかかり、その月の利用料に自動で充当されます。</p>`
+    :`<div class="kv" style="margin-top:8px"><span class="lbl">${+m.slice(5)}月の会費残高</span><b class="num">${yen(rem)} / ${yen(FEE)}</b></div>
+      <div class="meter" aria-hidden="true"><i style="width:${rem/FEE*100}%"></i></div>
+      <p class="note" style="margin-top:4px">${rem>0?`残り${yen(rem)}分は今月の予約に自動で使われます。`:"今月の会費分は使い切りました。以降は利用料をお支払いいただきます。"}</p>`}`;
+}
+function myBookings(){const out=[];
+  Object.keys(S.days).sort().forEach(ds=>Object.entries(S.days[ds].bookings||{}).forEach(([bid,b])=>{
+    if(b.by===S.uid&&b.status==="active"&&slotTime(ds,b.start+b.len)>new Date())out.push({ds,bid,b});}));
+  return out.sort((a,b)=>a.ds.localeCompare(b.ds)||a.b.start-b.b.start);}
+function renderMine(){
+  const list=myBookings();
+  let h=`<h2 id="h-mine">あなたの予約</h2>`;
+  if(!list.length){$("mine").innerHTML=h+`<p class="empty" style="margin-top:10px">これからの予約はありません。</p>`;return;}
+  h+=`<ul class="mylist" style="margin-top:10px">`+list.map(({ds,bid,b})=>{const d=parseD(ds),started=slotTime(ds,b.start)<=new Date();
+    const ask=S.cancelAsk===bid;
+    return `<li><span class="when">${d.getMonth()+1}/${d.getDate()}（${WD[d.getDay()]}）<span class="num">${tl(b.start)}–${tl(b.start+b.len)}</span></span>
+      <span class="code">入室コード<b class="num">${esc(b.code)}</b></span>
+      <span class="meta">${b.bay}番打席・お支払い <span class="num">${yen(b.pay)}</span></span>
+      <span class="acts">${started?`<span class="lbl">ご利用中</span>`:ask?`<span class="lbl" style="align-self:center">キャンセルしますか？</span><button class="sm danger" data-cancel="${bid}" data-ds="${ds}">キャンセルする</button><button class="sm" data-keep="1">戻る</button>`:`<button class="sm" data-ask="${bid}">キャンセル</button>`}</span></li>`;}).join("")+"</ul>";
+  $("mine").innerHTML=h;
+}
+function renderOwner(){
+  $("owner").hidden=!S.isOwner;if(!S.isOwner)return;
+  const ds=S.date,st=dayStats(ds);
+  const rows=Object.values(S.days[ds]?.bookings||{}).filter(b=>b.status==="active").sort((a,b)=>a.start-b.start||a.bay-b.bay);
+  $("owner-body").innerHTML=`<div class="owner-kpi">
+      <div><span>予約枠</span><b class="num">${st.booked}</b></div>
+      <div><span>稼働率（清掃除く）</span><b class="num">${(st.util*100).toFixed(1)}%</b></div>
+      <div><span>利用料（税込・割引後）</span><b class="num">${yen(st.rev)}</b></div></div>
+    ${rows.length?`<div class="tscroll"><table class="price"><thead><tr><th>時間</th><th>打席</th><th>お名前</th><th>支払い</th></tr></thead><tbody>${rows.map(b=>`<tr><td class="num">${tl(b.start)}–${tl(b.start+b.len)}</td><td>${b.bay}番</td><td>${esc(b.name)}</td><td class="num">${yen(b.pay||0)}</td></tr>`).join("")}</tbody></table></div>`:`<p class="empty">この日の予約はまだありません。</p>`}
+    <h2 style="margin:18px 0 8px">会員一覧（${S.members.length}名）</h2>
+    ${S.members.length?`<div class="tscroll"><table class="price"><thead><tr><th>入会日</th><th>氏名</th><th>電話番号</th><th>メール</th></tr></thead><tbody>${S.members.map(p=>{const j=new Date(p.joinedAt);
+      return `<tr><td class="num">${j.getFullYear()}/${j.getMonth()+1}/${j.getDate()}</td><td>${esc(p.name)}<br><span class="lbl">${esc(p.kana)}</span></td><td class="num">${esc(p.tel)}</td><td>${esc(p.mail)}</td></tr>`;}).join("")}</tbody></table></div>`:`<p class="empty">まだ会員はいません。</p>`}`;
+}
+function renderAll(){renderDates();renderGrid();renderBook();renderMember();renderMine();renderOwner();
+  const on=S.mode==="shared";$("mode-chip").classList.toggle("on",on);
+  $("mode-t").textContent=on?"予約受付中（共有データ）":"プレビュー（サンプル表示）";}
+
+function scrollGrid(){const now=new Date();let s;
+  if(S.date===dstr(now))s=Math.max(10,now.getHours()*2);else s=isPeakDay(S.date)?16:34;
+  const row=$("row-"+s)||$("row-10");const w=$("gridwrap");
+  if(row)w.scrollTop=row.offsetTop-w.querySelector("thead").offsetHeight-4;}
+
+// ---------- events ----------
+$("dates").addEventListener("click",e=>{const b=e.target.closest(".date");if(!b)return;
+  S.date=b.dataset.ds;S.sel=null;S.err="";S.done=null;renderAll();scrollGrid();});
+$("grid").addEventListener("click",e=>{const c=e.target.closest(".cell");if(!c||c.disabled)return;
+  S.sel={ds:S.date,bay:+c.dataset.bay,s:+c.dataset.s};S.done=null;S.err="";renderAll();
+  if(window.innerWidth<960)$("book").scrollIntoView({behavior:"smooth",block:"start"});});
+$("book").addEventListener("click",e=>{
+  const l=e.target.closest("[data-len]");if(l&&!l.disabled){S.len=+l.dataset.len;renderAll();return;}
+  if(e.target.id==="again"){S.done=null;S.sel=null;renderAll();return;}
+  if(e.target.id==="go-reg"){$("member").scrollIntoView({behavior:"smooth",block:"start"});setTimeout(()=>$("r-name")?.focus(),300);return;}
+  if(e.target.id==="submit")submit();});
+$("member").addEventListener("input",e=>{const k=e.target.dataset.k;if(!k)return;
+  S.reg[k]=e.target.type==="checkbox"?e.target.checked:e.target.value;});
+$("member").addEventListener("submit",async e=>{e.preventDefault();
+  const r=S.reg,t=s=>(s||"").trim(),tel=t(r.tel).replace(/[‐－ー−]/g,"-");
+  S.regErr=!t(r.name)?"氏名を入力してください。"
+    :!t(r.kana)?"フリガナを入力してください。"
+    :!/^0\d{1,4}-?\d{1,4}-?\d{3,4}$/.test(tel)?"電話番号を正しく入力してください（例：090-1234-5678）。"
+    :!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t(r.mail))?"メールアドレスを正しく入力してください。"
+    :!r.agree?"利用規約への同意にチェックを入れてください。":"";
+  if(S.regErr){renderMember();return;}
+  S.regBusy=true;renderMember();
+  try{
+    S.profile={member:true,name:t(r.name),kana:t(r.kana),tel,mail:t(r.mail),joinedAt:new Date().toISOString(),credit:{}};
+    await saveProfile();S.reg={};
+  }catch(err){S.profile=null;
+    S.regErr=err?.code==="invalid_argument"?"この画面では登録を保存できません（閲覧専用の可能性があります）。":"登録を保存できませんでした。もう一度お試しください。";}
+  S.regBusy=false;renderAll();
+  if(S.profile&&S.sel)$("book").scrollIntoView({behavior:"smooth",block:"start"});
+});
+$("mine").addEventListener("click",async e=>{
+  const a=e.target.closest("[data-ask]");if(a){S.cancelAsk=a.dataset.ask;renderMine();return;}
+  if(e.target.closest("[data-keep]")){S.cancelAsk=null;renderMine();return;}
+  const c=e.target.closest("[data-cancel]");if(c){c.disabled=true;await cancel(c.dataset.ds,c.dataset.cancel);}});
+
+async function submit(){
+  const {ds,bay,s}=S.sel,len=S.len;
+  if(maxLen(ds,bay,s)<len){S.err="選んだ時間に予約できない枠が含まれています。時間を短くするか、別の枠を選んでください。";renderAll();return;}
+  S.busy=true;S.err="";renderBook();
+  try{
+    if(!S.profile?.member)throw{code:"not_member"};
+    const q=quote(ds,s,len),bid="b"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    const rec={bay,start:s,len,name:S.profile.name,by:S.uid,status:"active",createdAt:new Date().toISOString(),
+      gross:q.gross,disc:q.disc,credit:q.credit,pay:q.pay,month:q.month,
+      code:String(Math.floor(1000+Math.random()*9000))};
+    await storeBook(ds,Array.from({length:len},(_,i)=>key(bay,s+i)),bid,rec);
+    S.profile.credit={...(S.profile.credit||{}),[q.month]:usedCredit(q.month)+q.credit};
+    if(q.credit)await saveProfile();
+    S.done={ds,rec};S.sel=null;S.len=2;
+  }catch(err){
+    const c=err?.code;
+    S.err=c==="not_member"?"ご予約には会員登録が必要です。":c==="taken"?"選んだ枠は直前に他の方が予約しました。別の枠を選んでください。"
+      :c==="busy"?"予約が混み合っています。少し待ってからもう一度お試しください。"
+      :c==="invalid_argument"?"この画面では予約を保存できません（閲覧専用の可能性があります）。"
+      :c==="quota_exceeded"?"予約データの保存上限に達しました。管理者にお問い合わせください。"
+      :"予約を保存できませんでした。通信状況を確認して、もう一度お試しください。";
+    if(c==="invalid_argument")S.readOnly=true;
+  }
+  S.busy=false;renderAll();
+}
+async function cancel(ds,bid){
+  const b=S.days[ds]?.bookings?.[bid];if(!b)return;
+  try{
+    await storeCancel(ds,bid,Array.from({length:b.len},(_,i)=>key(b.bay,b.start+i)));
+    if(S.profile){const m=b.month||ds.slice(0,7);
+      S.profile.credit={...(S.profile.credit||{}),[m]:Math.max(0,usedCredit(m)-(b.credit||0))};
+      if(b.credit)await saveProfile();}
+    S.cancelAsk=null;
+  }catch{S.cancelAsk=null;alertMine("キャンセルを保存できませんでした。もう一度お試しください。");return;}
+  renderAll();
+}
+function alertMine(msg){renderMine();$("mine").insertAdjacentHTML("beforeend",`<div class="err" role="alert">${esc(msg)}</div>`);}
+
+renderAll();scrollGrid();
+setInterval(()=>{if(!S.busy&&!document.activeElement?.closest?.("#reg"))renderAll();},60000);
+
+// ---------- shared data (live) ----------
+(async()=>{
+  const c=window.claude;if(!c?.use)return;
+  const [dbx,user]=await Promise.all([c.use("db").catch(()=>null),c.use("user").catch(()=>null)]);
+  if(user){S.isOwner=await user.isOwner();if(await user.can("data.write")===false)S.readOnly=true;}
+  if(!dbx){renderAll();return;}
+  db=dbx;S.mode="shared";S.days={};
+  const id=user?await user.id():null;
+  // 会員情報は members/<本人id>。本人だけが書け、オーナー（と編集者）だけが全員分を読める
+  if(id){S.uid=id;profileRef=db.doc("members/"+id);
+    try{const snap=await profileRef.get();S.profile=snap.exists?JSON.parse(JSON.stringify(snap.data())):null;}catch{S.profile=null;}}
+  else S.profile=null;
+  S.sel=null;renderAll();
+  if(S.isOwner)db.collection("members").onSnapshot(snap=>{
+    S.members=snap.docs.map(d=>d.data()).filter(p=>p.member).sort((a,b)=>String(b.joinedAt).localeCompare(String(a.joinedAt)));renderOwner();},()=>{});
+  db.collection("days").where("date",">=",dstr(new Date())).orderBy("date").limit(20).onSnapshot(snap=>{
+    const next={};snap.docs.forEach(d=>{next[d.id]=d.data();});S.days=next;
+    if(S.sel&&maxLen(S.sel.ds,S.sel.bay,S.sel.s)===0)S.sel=null;
+    renderAll();
+  },()=>{S.err="予約状況を読み込めませんでした。ページを開き直してください。";renderAll();});
+})();
+</script>
+
+</html>
