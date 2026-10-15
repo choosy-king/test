@@ -309,10 +309,10 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
         <div class="f"><label for="landArea">土地面積</label><div class="in"><input id="landArea" type="number" step="0.1"><span class="u">㎡</span></div></div>
         <div class="f"><label for="floorArea">延床面積</label><div class="in"><input id="floorArea" type="number" step="0.1"><span class="u">㎡</span></div></div>
         <div class="f"><label for="ptax">固都税</label><div class="in"><input id="ptax" type="number" step="1"><span class="u">万円/年</span></div></div>
-        <div class="f"><label for="otherRate">諸費用率</label><div class="in"><input id="otherRate" type="number" step="0.5"><span class="u">%</span></div></div>
+        <div class="f"><label for="otherRate">諸費用率（任意）</label><div class="in"><input id="otherRate" type="number" step="0.5"><span class="u">%</span></div></div>
         <div class="f"><label for="bldg">建物価格比率</label><div class="in"><input id="bldg" type="number" step="1"><span class="u">%</span></div></div>
         <div class="f"><label for="equip">うち設備比率（任意）</label><div class="in"><input id="equip" type="number" step="1"><span class="u">%</span></div></div>
-        <p class="hint">固都税は納税通知書や売主への確認で。諸費用率は仲介会社・司法書士の見積から（仲介手数料は自動計算）。建物価格比率は売買契約書の内訳か固定資産税評価額の按分で確認。設備比率は区分の根拠が無ければ空欄（設備を分けずに償却します）。</p>
+        <p class="hint">固都税は納税通知書や売主への確認で。諸費用率は空欄なら内訳（税・登記・融資手数料・保険等）から自動計算します。見積があれば率で上書きできます（仲介手数料は別に自動計算）。建物価格比率は売買契約書の内訳か固定資産税評価額の按分で確認。設備比率は区分の根拠が無ければ空欄（設備を分けずに償却します）。</p>
       </fieldset>
 
       <fieldset>
@@ -406,6 +406,14 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       </section>
 
       <div class="kpis" id="kpis"></div>
+
+      <section class="card" aria-labelledby="h-ic" id="costCard">
+        <h2 id="h-ic">初期費用と必要な自己資金 <small id="icSub"></small></h2>
+        <div class="loan-box" id="icBox"></div>
+        <h3>初期費用の内訳</h3>
+        <div class="scroll"><table id="icTable"></table></div>
+        <p class="note" id="icNote"></p>
+      </section>
 
       <section class="card" id="tabsCard">
         <div class="tabs" role="tablist" id="tabs">
@@ -556,7 +564,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
   // 未入力のとき計算上の扱いが明確な任意項目（推測ではなく「計上しない／補正しない」）
   const OPTIONAL_ZERO = { equip: 0, repYear: 0, repAmt: 0, landAdj: 1 };
   const GROUPS = [
-    { key: "core", name: "基本の収支", must: true, use: "すべての分析", ids: ["price","gpi","struct","age","ptax","otherRate","vac","decl","opex","loan","rate","term"] },
+    { key: "core", name: "基本の収支", must: true, use: "すべての分析", ids: ["price","gpi","struct","age","ptax","vac","decl","opex","loan","rate","term"] },
     { key: "tax", name: "税・減価償却", use: "税引後CF・帳簿分析・出口", ids: ["bldg","taxr"] },
     { key: "exit", name: "出口", use: "出口戦略・IRR", ids: ["hold","cap","sellc"] },
     { key: "seki", name: "積算", use: "積算価格・担保評価", ids: ["landArea","floorArea","rosen","repro"] },
@@ -566,7 +574,6 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
   // 一般的な前提値（物件の事実ではなく、個人の一棟投資で広く使われる目安）。値を書き換えると「一般値」の印が外れます。
   const GENERAL = {
-    otherRate: { v: 4, note: "登記・取得税・融資手数料等で価格の3〜5%程度" },
     vac: { v: 10, note: "空室・滞納で5〜10%程度を見込む例が多い（保守側の10%）" },
     decl: { v: 1, note: "年1%下落（新築は10年間0%、11年目から適用）" },
     opex: { v: 15, note: "管理費5%＋修繕・保険・共用費などで実効収入の15%前後（固都税は別）" },
@@ -707,6 +714,61 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     return q;
   }
 
+  // ---------- 初期費用の内訳 ----------
+  // 税額は固定資産税評価額の概算から計算（評価証明が手元にあれば差し替え推奨）
+  const stampSale = (v) => (v > 50000 ? 16 : v > 10000 ? 6 : v > 5000 ? 3 : v > 1000 ? 1 : v > 500 ? 0.5 : v > 100 ? 0.1 : 0); // 軽減税率
+  const stampLoan = (v) => (v > 50000 ? 40 : v > 10000 ? 10 : v > 5000 ? 6 : v > 1000 ? 2 : v > 500 ? 1 : v > 100 ? 0.4 : 0);
+  function initCosts(p) {
+    const P = p.price || 0, loan = Math.max(0, p.loan || 0);
+    const items = [];
+    const add = (k, v, basis, grp) => items.push({ k, v, basis, grp });
+    const brokerage = p.isNew === false && P > 400 ? (P * 0.03 + 6) * 1.1 : 0;
+    // 固定資産税評価額の概算
+    const legal = p.struct || 0, age = p.isNew ? 0 : p.age || 0, repro = p.repro > 0 ? p.repro : reproFor(legal);
+    let landEval = NaN, bldgEval = NaN, evalBasis = "";
+    if (p.landArea > 0 && p.rosen > 0) landEval = (p.landArea * p.rosen * 1000 * 0.875) / 1e4;
+    if (p.floorArea > 0 && legal > 0 && fin(repro)) bldgEval = p.floorArea * repro * 0.5 * Math.max(0.2, 1 - (age / legal) * 0.8);
+    if (fin(landEval) && fin(bldgEval)) evalBasis = "評価額は路線価・延床面積からの概算";
+    else {
+      const tot = P * 0.6, br = p.bldg > 0 ? p.bldg / 100 : 0.4;
+      if (!fin(landEval)) landEval = tot * (1 - br);
+      if (!fin(bldgEval)) bldgEval = tot * br;
+      evalBasis = "評価額は価格の60%と仮定（路線価・面積の入力で精度が上がります）";
+    }
+    add("仲介手数料", brokerage, p.isNew === false ? "（価格×3%＋6万円）×1.1" : "新築・売主物件のため不要", "取引");
+    add("印紙税（売買契約）", stampSale(P), "契約金額に応じた軽減税率", "税");
+    add("登録免許税（所有権移転・土地）", landEval * 0.02, `土地評価額${fmt(landEval, 0)}万円×2.0%`, "税");
+    add("登録免許税（所有権移転・建物）", bldgEval * 0.02, `建物評価額${fmt(bldgEval, 0)}万円×2.0%`, "税");
+    add("不動産取得税（土地）", landEval * 0.5 * 0.03, "土地評価額×1/2（宅地特例）×3%", "税");
+    add("不動産取得税（建物）", bldgEval * 0.03, "建物評価額×3%（住宅の控除適用前）", "税");
+    add("司法書士報酬", 15, "移転・抵当権設定登記の報酬目安", "登記");
+    if (loan > 0) {
+      add("印紙税（金銭消費貸借契約）", stampLoan(loan), "借入額に応じた税額", "融資");
+      add("登録免許税（抵当権設定）", loan * 0.004, "借入額×0.4%", "融資");
+      add("融資事務手数料", loan * 0.011, "借入額×1.1%（金融機関により定額5〜11万円の場合も）", "融資");
+    }
+    add("火災・地震保険（5年分）", (p.floorArea > 0 ? p.floorArea : P / 30) * 0.15, p.floorArea > 0 ? "延床面積×1,500円/㎡（構造・地域で変動）" : "延床面積が未入力のため価格から概算", "その他");
+    add("固都税の日割り精算", (p.ptax || 0) * 0.5, "年税額の半年分（引渡し時期で変動）", "その他");
+    const other = items.filter((x) => x.k !== "仲介手数料").reduce((a, x) => a + x.v, 0);
+    return { items, brokerage, other, total: brokerage + other, landEval, bldgEval, evalBasis };
+  }
+  function renderInitCosts(a) {
+    const ic = a.ic, useRate = fin(a.src.otherRate);
+    const initTotal = a.brokerage + a.other;
+    $("icSub").textContent = useRate ? `諸費用は入力した諸費用率${a.src.otherRate}%で計算（下の内訳は参考）` : "諸費用は内訳から自動計算";
+    $("icBox").innerHTML = [
+      ["初期費用総額", fmt(initTotal, 0) + "万円", `物件価格の${pct(initTotal / a.P, 1)}（仲介手数料 ${fmt(a.brokerage, 0)}＋諸費用 ${fmt(a.other, 0)}）`],
+      ["購入総額", fmt(a.total, 0) + "万円", `物件価格 ${fmt(a.P, 0)}＋初期費用 ${fmt(initTotal, 0)}`],
+      ["必要な自己資金（現金）", fmt(a.equity, 0) + "万円", a.loan > 0 ? `購入総額 − 借入 ${fmt(a.loan, 0)}万円` : "借入なし（全額現金）", a.equity > 0 && a.equity < initTotal ? "" : ""],
+    ].map(([k, v, d]) => `<div><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></div>`).join("");
+    const grpName = { 取引: "取引", 税: "税金", 登記: "登記", 融資: "融資", その他: "その他" };
+    let h = `<tr><th>項目</th><th>区分</th><th>金額（万円）</th><th>計算の根拠</th></tr>`;
+    ic.items.forEach((x) => { h += `<tr><td style="font-family:var(--f-body)">${x.k}</td><td style="font-family:var(--f-body)">${grpName[x.grp]}</td>${c1(x.v, 1)}<td style="font-family:var(--f-body);text-align:left;white-space:normal">${x.basis}</td></tr>`; });
+    h += `<tr class="sum"><td>内訳の合計</td><td></td>${c1(ic.total, 1)}<td style="font-family:var(--f-body);text-align:left">${useRate ? `計算に使っている額：仲介 ${fmt(a.brokerage, 1)}＋諸費用率分 ${fmt(a.other, 1)}＝${fmt(initTotal, 1)}` : ""}</td></tr>`;
+    $("icTable").innerHTML = h;
+    $("icNote").textContent = `${ic.evalBasis}。登録免許税は本則2.0%で計算しています（土地の軽減税率1.5%が延長されていればその分安くなります）。不動産取得税は住宅の控除・軽減の適用前で、新築や一定の中古住宅はこれより下がります。保証会社の保証料（借入額の2%前後）が必要な融資では別途かかります。`;
+  }
+
   // 家賃の推移：新築は10年間据え置き、11年目から下落率を適用。中古は1年目の翌年から適用
   function rentFactor(p, y) {
     const free = p.isNew === true ? 10 : 0;
@@ -718,7 +780,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     const p = calcValues(src);
     const P = p.price;
     const brokerage = p.isNew === false && P > 400 ? (P * 0.03 + 6) * 1.1 : 0;
-    const other = (P * p.otherRate) / 100;
+    const ic = initCosts(p);
+    const other = fin(src.otherRate) ? (P * p.otherRate) / 100 : ic.other;
     const total = P + brokerage + other;
     const loan = Math.max(0, p.loan);
     const equity = total - loan;
@@ -762,7 +825,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       rows.push({ y, gpi, egi, opex, noi, repair, ds, interest, principal, bal: Math.max(0, bal), dep, accDep, btcf, taxable, tax, atcf, cum, cumB,
         bookB: bldgBasis - accDep, bookL: landBasis });
     }
-    const a = { p, src, ok: st.ok, miss: st.m, P, brokerage, other, total, loan, equity, legal, remainLegal, lifeS, lifeE, depS, depE, bldgBasis, equipBasis, landBasis, H, rows, pm };
+    const a = { ic, p, src, ok: st.ok, miss: st.m, P, brokerage, other, total, loan, equity, legal, remainLegal, lifeS, lifeE, depS, depE, bldgBasis, equipBasis, landBasis, H, rows, pm };
     a.sale = (h, capPct) => saleAt(a, h, capPct);
     const s = a.sale(H, p.cap);
     const y1 = rows[0];
@@ -1148,7 +1211,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     renderNeed(st, p);
     $("propLabel").textContent = [p.pname, p.addr].filter(Boolean).join("／");
     const showRes = st.ok.core;
-    ["verdictCard", "scoreCard", "kpis", "tabsCard"].forEach((id) => ($(id).hidden = !showRes));
+    ["verdictCard", "scoreCard", "kpis", "costCard", "tabsCard"].forEach((id) => ($(id).hidden = !showRes));
     renderCompare();
     if (!showRes) { current = null; return; }
 
@@ -1169,6 +1232,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     $("alerts").innerHTML = j.al.map((x) => `<li><span class="chip ${x.lv}">${chipLabel[x.lv]}</span><span>${x.t}</span></li>`).join("");
     $("memoBar").hidden = !sampleFn;
     renderScore(sc);
+    renderInitCosts(a);
 
     const k = [
       ["表面利回り", pct(a.surface), "満室年収÷物件価格"],
@@ -1893,8 +1957,8 @@ ${facts}`, { signal: (ctl = new AbortController()).signal, onText: ({ text }) =>
   function priceInfo() {
     const p = read(), q = calcValues(p);
     const price = fin(p.price) ? p.price : NaN;
-    const brokerage = q.isNew === false && price > 400 ? (price * 0.03 + 6) * 1.1 : 0;
-    const total = fin(price) ? price + brokerage + (price * (fin(p.otherRate) ? p.otherRate : 0)) / 100 : NaN;
+    const ic = initCosts(Object.assign({}, q, { loan: fin(p.loan) ? p.loan : fin(price) ? price * 0.9 : 0 }));
+    const total = fin(price) ? price + ic.brokerage + (fin(p.otherRate) ? (price * p.otherRate) / 100 : ic.other) : NaN;
     const remain = fin(p.struct) ? (p.isNew === true ? p.struct : fin(p.age) ? Math.max(0, p.struct - p.age) : NaN) : NaN;
     return { price, total, remain };
   }
