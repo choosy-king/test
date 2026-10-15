@@ -1,0 +1,2088 @@
+<title>物件収支アナライザー</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 上段に資料読込、下段は左に入力シート（デスクトップでは固定）、右に判定→指標→分析タブ（CF/出口/帳簿/賃料/積算/比較）。スマホでは縦1列。 */
+:root {
+  --bg: #f3f5f4;
+  --panel: #ffffff;
+  --ink: #17221f;
+  --ink-2: #4a5753;
+  --ink-3: #7b8783;
+  --line: #d9dfdc;
+  --accent: #0d6b5f;
+  --accent-soft: #e0efeb;
+  --neg: #b4472c;
+  --neg-soft: #f6e4de;
+  --warn: #9a6a00;
+  --warn-soft: #f8eed3;
+  --ok: #2c7a3f;
+  --ok-soft: #e1f0e4;
+  --f-display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111816; --panel: #18211e; --ink: #e6ece9; --ink-2: #b2bdb9; --ink-3: #85918d; --line: #2c3834;
+    --accent: #4fb8a6; --accent-soft: #1b3530; --neg: #e3826a; --neg-soft: #3a2420;
+    --warn: #e0b452; --warn-soft: #362d17; --ok: #6cc183; --ok-soft: #1c3322; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111816; --panel: #18211e; --ink: #e6ece9; --ink-2: #b2bdb9; --ink-3: #85918d; --line: #2c3834;
+  --accent: #4fb8a6; --accent-soft: #1b3530; --neg: #e3826a; --neg-soft: #3a2420;
+  --warn: #e0b452; --warn-soft: #362d17; --ok: #6cc183; --ok-soft: #1c3322; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1260px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+h1 { font-family: var(--f-display); font-size: 1.85rem; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+.sub { color: var(--ink-2); margin: 0; font-size: .9rem; }
+.grid { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+aside.inputs { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 901px) { aside.inputs { position: sticky; top: calc(12px + env(safe-area-inset-top, 0px)); max-height: calc(100vh - 24px); overflow-y: auto; } }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+legend, .lg { font-size: .72rem; font-weight: 700; letter-spacing: .12em; color: var(--accent); padding: 0; margin-bottom: 8px; grid-column: 1 / -1; }
+.f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.f.full { grid-column: 1 / -1; }
+.f label { font-size: .78rem; color: var(--ink-2); }
+.in { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.in:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.in input, .in select { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font: 500 .95rem var(--f-num); padding: 6px 8px; outline: none; }
+.in select, .in input[type="text"] { font-family: var(--f-body); }
+.in .u { font-size: .72rem; color: var(--ink-3); padding-right: 8px; white-space: nowrap; }
+.in.filled { border-color: var(--accent); }
+.hint { font-size: .74rem; color: var(--ink-3); grid-column: 1 / -1; margin-top: -4px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: var(--bg); color: var(--ink-2); font: 500 .85rem var(--f-body); padding: 6px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+button:focus-visible, textarea:focus-visible, .drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main.out { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+h2 { font-family: var(--f-display); font-size: 1.15rem; margin: 0 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h2 small { font-family: var(--f-body); font-weight: 400; font-size: .78rem; color: var(--ink-3); }
+h3 { font-size: .9rem; margin: 18px 0 8px; color: var(--ink-2); }
+
+/* 資料読込 */
+.ingest { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .ingest { grid-template-columns: minmax(0, 1fr); } }
+.drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; cursor: pointer; min-height: 132px; color: var(--ink-2); background: var(--bg); }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { color: var(--ink); }
+.drop .pick { font-size: .95rem; padding: 10px 22px; }
+.vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.flist { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.flist li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px 4px 10px; font-size: .8rem; text-align: left; min-width: 0; }
+.flist li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.flist li small { color: var(--ink-3); white-space: nowrap; }
+/* スコア */
+.score-top { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: center; }
+@media (max-width: 640px) { .score-top { grid-template-columns: minmax(0, 1fr); } }
+.score-big { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.score-big svg { width: 150px; height: 150px; display: block; }
+.score-big .num { font: 500 2.6rem var(--f-num); fill: var(--ink); }
+.score-big .of { font: .8rem var(--f-num); fill: var(--ink-3); }
+.grade { font-family: var(--f-display); font-size: 1.05rem; font-weight: 700; padding: 2px 14px; border-radius: 999px; }
+.g-a { background: var(--ok-soft); color: var(--ok); }
+.g-b { background: var(--accent-soft); color: var(--accent); }
+.g-c { background: var(--warn-soft); color: var(--warn); }
+.g-d { background: var(--neg-soft); color: var(--neg); }
+.cat-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 4.2em 3.2em; gap: 10px; align-items: center; font-size: .86rem; }
+.cat-row .w { font-size: .72rem; color: var(--ink-3); text-align: right; }
+.cat-row .pt { font-family: var(--f-num); text-align: right; font-variant-numeric: tabular-nums; }
+.cats { display: flex; flex-direction: column; gap: 9px; }
+table.items td:nth-child(5) { white-space: normal; text-align: left; font-family: var(--f-body); color: var(--ink-2); min-width: 16em; }
+table.items tr.cat-h td { background: var(--bg); font-family: var(--f-body); font-weight: 700; color: var(--ink); }
+.bank-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; padding: 12px; background: var(--bg); border-radius: 8px; }
+@media (max-width: 760px) { .bank-in { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bank-in .in { background: var(--panel); }
+.bank-in .lg { margin: 0; }
+.loan-box { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+@media (max-width: 640px) { .loan-box { grid-template-columns: minmax(0, 1fr); } }
+.loan-box > div { background: var(--panel); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.loan-box .k { font-size: .76rem; color: var(--ink-2); }
+.loan-box .v { font: 500 1.3rem var(--f-num); font-variant-numeric: tabular-nums; }
+.loan-box .d { font-size: .74rem; color: var(--ink-3); }
+.loan-box .v.neg { color: var(--neg); }
+.loan-box .v.pos { color: var(--ok); }
+tr.min td { background: var(--warn-soft); }
+tr.sum td { font-weight: 700; }
+.dots { display: inline-flex; gap: 2px; vertical-align: middle; }
+.dots i { width: 6px; height: 10px; border-radius: 1px; background: var(--line); display: block; }
+.dots i.on { background: var(--accent); }
+.dots.low i.on { background: var(--neg); }
+.dots.mid i.on { background: var(--warn); }
+.drop small { color: var(--ink-3); font-size: .74rem; }
+textarea { width: 100%; min-height: 132px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: .85rem/1.5 var(--f-body); padding: 10px; }
+.ingest-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+.status { font-size: .84rem; color: var(--ink-2); }
+.status.err { color: var(--neg); }
+.found { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.found span { font-size: .76rem; padding: 2px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.found span.miss { background: var(--warn-soft); color: var(--warn); }
+
+.verdict { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.badge { font-weight: 700; font-size: .95rem; padding: 6px 14px; border-radius: 999px; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--neg-soft); color: var(--neg); }
+.alerts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.alerts li { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: 10px; align-items: start; font-size: .88rem; }
+.chip { font-size: .7rem; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 4px; white-space: nowrap; margin-top: 2px; text-align: center; }
+.chip.bad { background: var(--neg-soft); color: var(--neg); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+@media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: var(--panel); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.kpi .k { font-size: .74rem; color: var(--ink-2); }
+.kpi .v { font: 500 1.35rem var(--f-num); font-variant-numeric: tabular-nums; }
+.kpi .v.neg { color: var(--neg); }
+.kpi .d { font-size: .72rem; color: var(--ink-3); }
+
+.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); margin: -4px 0 16px; }
+.tabs button { border: 0; background: transparent; color: var(--ink-2); font: 500 .9rem var(--f-body); padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+.pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; font-size: .86rem; }
+.pairs div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+.pairs span:last-child { font-family: var(--f-num); font-variant-numeric: tabular-nums; text-align: right; }
+.pairs b { font-family: var(--f-num); }
+.chart-box { position: relative; }
+.chart-box svg { display: block; width: 100%; height: auto; }
+.chart-box text { font-family: var(--f-num); font-size: 11px; fill: var(--ink-3); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: .78rem; padding: 6px 10px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); font-family: var(--f-num); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .82rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 500; color: var(--ink-2); font-size: .76rem; }
+th:first-child, td:first-child { text-align: left; }
+td { font-family: var(--f-num); }
+td.neg { color: var(--neg); }
+td.pos { color: var(--ok); }
+tr.hl td { background: var(--accent-soft); }
+tr.best td { background: var(--ok-soft); }
+.sens td { text-align: center; }
+.sens td.base { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sens td.neg { background: var(--neg-soft); }
+table.roll td input { width: 100%; min-width: 70px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); font: .82rem var(--f-num); padding: 3px 6px; text-align: right; }
+table.roll td:first-child input { text-align: left; font-family: var(--f-body); }
+table.roll select { border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); font: .8rem var(--f-body); padding: 3px; }
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 7em; gap: 10px; align-items: center; font-size: .84rem; }
+.bar-track { height: 14px; background: var(--bg); border-radius: 0 4px 4px 0; position: relative; }
+.bar-fill { height: 100%; border-radius: 0 4px 4px 0; }
+.bar-row .val { font-family: var(--f-num); text-align: right; font-variant-numeric: tabular-nums; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--panel); font: 700 .85rem var(--f-body); padding: 7px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.sm { padding: 3px 9px; font-size: .76rem; font-weight: 500; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.note { font-size: .76rem; color: var(--ink-3); margin: 10px 0 0; }
+.memo { white-space: pre-wrap; font-size: .9rem; line-height: 1.75; max-width: 72ch; }
+.example { font-size: .76rem; background: var(--warn-soft); color: var(--warn); padding: 4px 10px; border-radius: 4px; }
+.save-row { display: flex; gap: 8px; }
+.save-row .in { flex: 1; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.in.missing { border-style: dashed; border-color: var(--warn); }
+.in.filled { border-color: var(--accent); }
+.lack { background: var(--warn-soft); color: var(--ink); border-radius: 8px; padding: 12px 14px; font-size: .86rem; }
+.lack b { color: var(--warn); }
+.need-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 20px; }
+.need-grid > div { border-top: 2px solid var(--line); padding-top: 8px; font-size: .84rem; }
+.need-grid > div.done { border-top-color: var(--ok); }
+.need-grid > div.todo { border-top-color: var(--warn); }
+.need-grid > div.must.todo { border-top-color: var(--neg); }
+.need-grid h4 { margin: 0 0 4px; font-size: .84rem; display: flex; justify-content: space-between; gap: 8px; }
+.need-grid ul { margin: 0; padding-left: 1.1em; color: var(--ink-2); }
+.need-grid .st { font-size: .72rem; font-weight: 700; }
+.need-grid .done .st { color: var(--ok); }
+.need-grid .todo .st { color: var(--warn); }
+.need-grid .must.todo .st { color: var(--neg); }
+details.src { margin-top: 10px; font-size: .84rem; }
+details.src summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+details.src td:last-child { white-space: normal; font-family: var(--f-body); color: var(--ink-2); text-align: left; min-width: 18em; }
+.head-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.in.general { border-color: var(--line); background: var(--panel); }
+.etag { display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--warn); background: var(--warn-soft); border-radius: 3px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+.in.est { border-color: var(--warn); background: var(--warn-soft); }
+.gtag { display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+.gen-list { font-size: .8rem; color: var(--ink-2); margin: 10px 0 0; }
+/* 融資条件の質問 */
+.wiz { border: 1.5px solid var(--accent); }
+.wiz-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wiz-prog { display: flex; gap: 4px; margin: 4px 0 14px; }
+.wiz-prog i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.wiz-prog i.on { background: var(--accent); }
+.wiz-q { font-family: var(--f-display); font-size: 1.15rem; margin: 0 0 4px; text-wrap: balance; }
+.wiz-help { font-size: .82rem; color: var(--ink-2); margin: 0 0 12px; max-width: 70ch; }
+.wiz-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.wiz-opt { text-align: left; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 10px 12px; cursor: pointer; font: .9rem var(--f-body); display: flex; flex-direction: column; gap: 2px; }
+.wiz-opt:hover { border-color: var(--accent); }
+.wiz-opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.wiz-opt b { font-weight: 700; }
+.wiz-opt small { color: var(--ink-3); font-size: .74rem; }
+.wiz-num { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.wiz-num .in { max-width: 240px; flex: 1; min-width: 160px; }
+.wiz-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.wiz-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 20px; font-size: .88rem; }
+.wiz-sum div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+.wiz-sum span:last-child { font-family: var(--f-num); text-align: right; }
+.wiz-err { color: var(--neg); font-size: .82rem; margin-top: 6px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>物件収支アナライザー</h1>
+      <p class="sub">物件資料と、あなたが確認した条件だけで計算します。未入力の項目は推測で埋めず、その項目を使う分析を「データ不足」として止めます。金額は万円単位です。</p>
+    </div>
+    <div class="head-btns">
+      <span class="example" id="exampleTag" hidden>サンプル物件の値を表示中（実在の物件ではありません）</span>
+      <button class="btn ghost sm" type="button" id="sampleBtn">サンプル物件で試す</button>
+      <button class="btn sm" type="button" id="estBtn">未入力を推定して補完</button>
+      <button class="btn ghost sm" type="button" id="genBtn">前提を一般値に戻す</button>
+      <button class="btn ghost sm" type="button" id="clearBtn">入力をすべて消去</button>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="h-in">
+    <h2 id="h-in">物件資料の読み込み <small>マイソク・物件概要書・レントロール（PDF・画像・Excel・テキスト）</small></h2>
+    <div class="ingest">
+      <div class="drop" id="drop">
+        <label for="file" class="btn pick">ファイルを選択</label>
+        <input type="file" id="file" class="vh" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.csv,.tsv,.xlsx,.xls,text/plain,text/csv,application/pdf,image/*,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        <span>またはここにドラッグ＆ドロップ</span>
+        <small>PDF・画像（JPG/PNG）・Excel・CSV・テキスト。複数可。選ぶとすぐ読み取りを始めます</small>
+        <ul class="flist" id="flist"></ul>
+      </div>
+      <div class="f">
+        <label for="paste">または概要をテキストで貼り付け</label>
+        <textarea id="paste" placeholder="例）価格 1億2,000万円／表面利回り 7.5%／RC造 地上5階 2004年築／土地 330.5㎡／延床 600㎡／満室想定年収 900万円／路線価 250千円/㎡ …"></textarea>
+      </div>
+    </div>
+    <div class="ingest-bar">
+      <button class="btn" type="button" id="readBtn">読み取って分析</button>
+      <button class="btn ghost" type="button" id="stopBtn" hidden>中止</button>
+      <span class="status" id="readStatus" aria-live="polite">ファイルを選ぶか、テキストを貼り付けてください。</span>
+    </div>
+    <div class="found" id="found"></div>
+    <details class="src" id="srcBox" hidden>
+      <summary>読み取りの根拠（資料のどの記載から取ったか）</summary>
+      <div class="scroll"><table id="srcTable"></table></div>
+    </details>
+  </section>
+
+  <div class="grid">
+    <aside class="inputs" aria-label="物件条件の入力">
+      <fieldset>
+        <legend>物件（資料の記載どおりに）</legend>
+        <div class="f full"><label for="pname">物件名</label><div class="in"><input id="pname" type="text"></div></div>
+        <div class="f full"><label for="addr">所在地</label><div class="in"><input id="addr" type="text"></div></div>
+        <div class="f full">
+          <label>区分</label>
+          <div class="seg" role="group" aria-label="新築・中古" id="kindSeg">
+            <button type="button" id="kNew" aria-pressed="false">新築（売主物件）</button>
+            <button type="button" id="kUsed" aria-pressed="false">中古（仲介）</button>
+          </div>
+        </div>
+        <div class="f"><label for="price">物件価格</label><div class="in"><input id="price" type="number" step="10"><span class="u">万円</span></div></div>
+        <div class="f"><label for="gpi">満室想定年収</label><div class="in"><input id="gpi" type="number" step="1"><span class="u">万円/年</span></div></div>
+        <div class="f"><label for="struct">構造</label><div class="in"><select id="struct">
+          <option value="">選択してください</option>
+          <option value="47">RC・SRC（47年）</option>
+          <option value="34">重量鉄骨 4mm超（34年）</option>
+          <option value="27">軽量鉄骨 3〜4mm（27年）</option>
+          <option value="19">軽量鉄骨 3mm以下（19年）</option>
+          <option value="22">木造（22年）</option>
+        </select></div></div>
+        <div class="f"><label for="age">築年数</label><div class="in"><input id="age" type="number" step="1" min="0"><span class="u">年</span></div></div>
+        <div class="f"><label for="landArea">土地面積</label><div class="in"><input id="landArea" type="number" step="0.1"><span class="u">㎡</span></div></div>
+        <div class="f"><label for="floorArea">延床面積</label><div class="in"><input id="floorArea" type="number" step="0.1"><span class="u">㎡</span></div></div>
+        <div class="f"><label for="ptax">固都税</label><div class="in"><input id="ptax" type="number" step="1"><span class="u">万円/年</span></div></div>
+        <div class="f"><label for="otherRate">諸費用率（任意）</label><div class="in"><input id="otherRate" type="number" step="0.5"><span class="u">%</span></div></div>
+        <div class="f"><label for="bldg">建物価格比率</label><div class="in"><input id="bldg" type="number" step="1"><span class="u">%</span></div></div>
+        <div class="f"><label for="equip">うち設備比率（任意）</label><div class="in"><input id="equip" type="number" step="1"><span class="u">%</span></div></div>
+        <p class="hint">固都税は納税通知書や売主への確認で。諸費用率は空欄なら内訳（税・登記・融資手数料・保険等）から自動計算します。見積があれば率で上書きできます（仲介手数料は別に自動計算）。建物価格比率は売買契約書の内訳か固定資産税評価額の按分で確認。設備比率は区分の根拠が無ければ空欄（設備を分けずに償却します）。</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>運営の前提（あなたの見立て）</legend>
+        <div class="f"><label for="vac">空室・滞納損</label><div class="in"><input id="vac" type="number" step="1"><span class="u">%</span></div></div>
+        <div class="f"><label for="decl" id="declLabel">家賃下落</label><div class="in"><input id="decl" type="number" step="0.1"><span class="u">%/年</span></div></div>
+        <div class="f"><label for="opex">運営経費率</label><div class="in"><input id="opex" type="number" step="1"><span class="u">%</span></div></div>
+        <div class="f"><label for="repYear">大規模修繕の時期（任意）</label><div class="in"><input id="repYear" type="number" step="1"><span class="u">年目</span></div></div>
+        <div class="f full"><label for="repAmt">大規模修繕の費用（任意）</label><div class="in"><input id="repAmt" type="number" step="10"><span class="u">万円</span></div></div>
+        <p class="hint">運営経費率は実効収入に対する管理費・修繕・保険・共用電気など（固都税は別欄）。管理会社の見積や過去の収支実績を根拠にしてください。大規模修繕は修繕履歴・長期修繕計画がある場合のみ入力（空欄なら計上しません）。</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>融資・税（打診結果・ご自身の税率）</legend>
+        <button class="btn ghost sm full" type="button" id="finAsk" style="grid-column:1/-1">融資条件を質問に答えて入力</button>
+        <div class="f"><label for="loan">借入額</label><div class="in"><input id="loan" type="number" step="10"><span class="u">万円</span></div></div>
+        <div class="f"><label for="rate">金利</label><div class="in"><input id="rate" type="number" step="0.05"><span class="u">%</span></div></div>
+        <div class="f"><label for="term">期間</label><div class="in"><input id="term" type="number" step="1"><span class="u">年</span></div></div>
+        <div class="f"><label for="taxr">所得税+住民税率</label><div class="in"><input id="taxr" type="number" step="1"><span class="u">%</span></div></div>
+        <p class="hint">現金購入なら借入額に0を入力。税率は前年の課税所得に対する所得税（復興税込）＋住民税10%。</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>出口の前提</legend>
+        <div class="f"><label for="hold">保有期間</label><div class="in"><input id="hold" type="number" step="1" min="1" max="35"><span class="u">年</span></div></div>
+        <div class="f"><label for="cap">売却時の表面利回り</label><div class="in"><input id="cap" type="number" step="0.1"><span class="u">%</span></div></div>
+        <div class="f"><label for="sellc">売却費用</label><div class="in"><input id="sellc" type="number" step="0.5"><span class="u">%</span></div></div>
+        <p class="hint">売却時の表面利回り（満室年収÷売却価格）。同エリア・同築年帯の取引事例や売出事例を根拠にしてください。</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>賃料・積算の基準</legend>
+        <div class="f"><label for="mkt">相場賃料単価</label><div class="in"><input id="mkt" type="number" step="10"><span class="u">円/㎡・月</span></div></div>
+        <div class="f"><label for="rosen">路線価</label><div class="in"><input id="rosen" type="number" step="1"><span class="u">千円/㎡</span></div></div>
+        <div class="f"><label for="repro">再調達単価</label><div class="in"><input id="repro" type="number" step="0.5"><span class="u">万円/㎡</span></div></div>
+        <div class="f"><label for="landAdj">土地評価の補正（任意）</label><div class="in"><input id="landAdj" type="number" step="0.05"><span class="u">倍</span></div></div>
+        <p class="hint">相場賃料単価は近隣の同条件の募集事例から。路線価は国税庁の路線価図で確認。再調達単価は打診先の金融機関の基準を入力（参考：RC 20・重量鉄骨 18・木造 15万円/㎡程度とする例が多い）。補正は空欄なら1.0（補正なし）。</p>
+      </fieldset>
+
+      <div>
+        <div class="lg">比較用に保存（この端末のみ）</div>
+        <div class="save-row">
+          <div class="in"><input id="sname" type="text" placeholder="保存名（空欄なら物件名）" aria-label="保存名"></div>
+          <button class="btn" type="button" id="saveBtn">保存</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="out">
+      <section class="card wiz" aria-labelledby="h-wiz" id="finWiz" hidden>
+        <div class="wiz-head">
+          <h2 id="h-wiz">融資条件の質問 <small id="wizStep"></small></h2>
+          <button class="btn ghost sm" type="button" id="wizClose">閉じる</button>
+        </div>
+        <div class="wiz-prog" id="wizProg"></div>
+        <div id="wizBody"></div>
+        <div class="wiz-nav">
+          <button class="btn ghost" type="button" id="wizBack">戻る</button>
+          <button class="btn" type="button" id="wizNext">次へ</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-need" id="needCard">
+        <h2 id="h-need">入力データの状況 <small id="needSub"></small></h2>
+        <div class="row-btns" id="estBar" hidden style="margin:-4px 0 12px"><button class="btn sm" type="button" id="estBtn2">未入力を推定して補完</button><span class="status" id="estStatus"></span></div>
+        <div class="row-btns" id="finAskBar" hidden style="margin:-4px 0 12px"><button class="btn sm" type="button" id="finAsk2">融資条件を質問に答えて入力</button><span class="status">借入額・金利・期間が未入力です</span></div>
+        <div class="need-grid" id="needGrid"></div>
+        <p class="gen-list" id="genList"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-v" id="verdictCard">
+        <h2 id="h-v">投資判断 <small id="propLabel"></small></h2>
+        <div class="verdict"><span class="badge" id="badge"></span><span id="verdictText" style="color:var(--ink-2);font-size:.9rem"></span></div>
+        <ul class="alerts" id="alerts"></ul>
+        <div class="row-btns" id="memoBar" hidden>
+          <button class="btn ghost" type="button" id="memoBtn">AIに総合所見を書いてもらう</button>
+          <span class="status" id="memoStatus"></span>
+        </div>
+        <div class="memo" id="memo"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-sc" id="scoreCard">
+        <h2 id="h-sc">総合スコア <small id="scoreSub"></small></h2>
+        <div class="score-top">
+          <div class="score-big" id="scoreBig"></div>
+          <div class="cats" id="cats"></div>
+        </div>
+        <h3>項目別の評価</h3>
+        <div class="scroll"><table class="items" id="items"></table></div>
+        <p class="note">評価：◎ 8点以上／○ 6点以上／△ 4点以上／× 4点未満。データが無い項目は採点せず「データ不足」とし、その分野の重みは採点できた分野だけで按分します。基準は個人の一棟投資を想定した目安です。</p>
+      </section>
+
+      <div class="kpis" id="kpis"></div>
+
+      <section class="card" aria-labelledby="h-ic" id="costCard">
+        <h2 id="h-ic">初期費用と必要な自己資金 <small id="icSub"></small></h2>
+        <div class="loan-box" id="icBox"></div>
+        <h3>初期費用の内訳</h3>
+        <div class="scroll"><table id="icTable"></table></div>
+        <p class="note" id="icNote"></p>
+      </section>
+
+      <section class="card" id="tabsCard">
+        <div class="tabs" role="tablist" id="tabs">
+          <button role="tab" data-tab="cf" aria-selected="true">CF分析</button>
+          <button role="tab" data-tab="exit" aria-selected="false">出口戦略</button>
+          <button role="tab" data-tab="book" aria-selected="false">帳簿分析</button>
+          <button role="tab" data-tab="rent" aria-selected="false">賃料の適正</button>
+          <button role="tab" data-tab="seki" aria-selected="false">積算価格</button>
+          <button role="tab" data-tab="bank" aria-selected="false">銀行評価</button>
+          <button role="tab" data-tab="cmp" aria-selected="false">物件比較</button>
+        </div>
+
+        <div data-panel="cf">
+          <h2>キャッシュフロー <small>万円</small></h2>
+          <div class="pairs" id="cost"></div>
+          <h3 id="chartTitle">税引後CFの推移（保有期間）</h3>
+          <div class="chart-box" id="chart"></div>
+          <h3>感応度：初年度の税引前CF（金利×空室率）</h3>
+          <div class="scroll"><table class="sens" id="sens"></table></div>
+          <p class="note">太枠が現在の条件。赤は持ち出しになる組み合わせです。</p>
+          <h3>年次CF表</h3>
+          <div class="scroll"><table id="ytable"></table></div>
+          <p class="note" id="cfNote"></p>
+        </div>
+
+        <div data-panel="exit" hidden>
+          <h2>出口戦略 <small>売却年 × 売却時利回りで手取りとIRRを比較</small></h2>
+          <div class="lack" id="lack-exit" hidden></div>
+          <div id="body-exit">
+            <div class="pairs" id="exitSum"></div>
+            <h3>売却年別のシナリオ</h3>
+            <div class="scroll"><table id="exitTable"></table></div>
+            <p class="note">売却価格＝売却翌年の満室想定年収÷売却時の表面利回り。手取り＝売却価格−売却費用−残債−譲渡税。緑の行は入力した売却時利回りでIRRが最も高い売却年。「買主の融資」は売却時点の残存法定耐用年数です。</p>
+            <h3>保有し続けた場合との比較</h3>
+            <div class="pairs" id="exitHold"></div>
+          </div>
+        </div>
+
+        <div data-panel="book" hidden>
+          <h2>帳簿分析 <small>不動産所得・簿価・純資産の推移</small></h2>
+          <div class="lack" id="lack-book" hidden></div>
+          <div id="body-book">
+            <div class="pairs" id="bookSum"></div>
+            <h3>年次の損益と貸借</h3>
+            <div class="scroll"><table id="bookTable"></table></div>
+            <p class="note">不動産所得＝NOI−修繕費−支払利息−減価償却。純資産（時価）＝想定時価−残債（売却時利回りが未入力の場合は表示しません）。色付きの行は帳簿上は黒字なのに手元資金が減っている年です。</p>
+          </div>
+        </div>
+
+        <div data-panel="rent" hidden>
+          <h2>賃料の適正 <small>レントロールと相場の比較</small></h2>
+          <div class="lack" id="lack-rent" hidden></div>
+          <div class="pairs" id="rentSum"></div>
+          <div class="row-btns">
+            <button class="btn ghost sm" type="button" id="addRoom">部屋を追加</button>
+            <button class="btn ghost sm" type="button" id="useRollGpi">レントロールの合計を満室年収に使う</button>
+            <span class="status" id="mktStatus"></span>
+          </div>
+          <h3>部屋別の賃料と相場との差</h3>
+          <div class="scroll"><table class="roll" id="rollTable"></table></div>
+          <p class="note">空室は募集賃料で入力してください。相場との差が±10%を超える部屋に印が付きます。相場賃料単価は近隣の募集事例など根拠のある値を入力してください。</p>
+        </div>
+
+        <div data-panel="seki" hidden>
+          <h2>積算価格 <small>土地＋建物の原価で見た評価</small></h2>
+          <div class="lack" id="lack-seki" hidden></div>
+          <div id="body-seki">
+            <div class="bars" id="sekiBars"></div>
+            <h3>計算の内訳</h3>
+            <div class="pairs" id="sekiSum"></div>
+            <p class="note">土地＝土地面積×路線価×補正。建物＝延床面積×再調達単価×残存耐用年数÷法定耐用年数。</p>
+          </div>
+        </div>
+
+        <div data-panel="bank" hidden>
+          <h2>銀行評価 <small>金融機関の審査目線での積算評価・収益還元評価と融資可能額の試算</small></h2>
+          <div class="bank-in">
+            <div class="lg" style="grid-column:1/-1">積算評価の条件</div>
+            <div class="f"><label for="bLandBasis">土地の評価基準</label><div class="in"><select id="bLandBasis"><option value="">選択してください</option><option value="1">路線価</option><option value="1.25">公示価格水準（路線価÷0.8）</option></select></div></div>
+            <div class="f"><label for="bkLand">土地の掛目</label><div class="in"><input id="bkLand" type="number" step="5"><span class="u">%</span></div></div>
+            <div class="f"><label for="bkBldg">建物の掛目</label><div class="in"><input id="bkBldg" type="number" step="5"><span class="u">%</span></div></div>
+            <div class="f"><label for="bkInc">収益評価の掛目</label><div class="in"><input id="bkInc" type="number" step="5"><span class="u">%</span></div></div>
+            <div class="lg" style="grid-column:1/-1">収益還元評価の条件（銀行の査定値）</div>
+            <div class="f"><label for="bVac">査定空室率</label><div class="in"><input id="bVac" type="number" step="1"><span class="u">%</span></div></div>
+            <div class="f"><label for="bExp">査定経費率</label><div class="in"><input id="bExp" type="number" step="1"><span class="u">%</span></div></div>
+            <div class="f"><label for="bCap">還元利回り</label><div class="in"><input id="bCap" type="number" step="0.1"><span class="u">%</span></div></div>
+            <div class="f"><label for="bDisc">DCF割引率</label><div class="in"><input id="bDisc" type="number" step="0.1"><span class="u">%</span></div></div>
+            <div class="lg" style="grid-column:1/-1">返済能力の審査条件</div>
+            <div class="f"><label for="bRate">審査金利</label><div class="in"><input id="bRate" type="number" step="0.1"><span class="u">%</span></div></div>
+            <div class="f"><label for="bDscr">必要DSCR</label><div class="in"><input id="bDscr" type="number" step="0.05"><span class="u">倍</span></div></div>
+            <div class="f"><label for="bRatio">返済比率の上限</label><div class="in"><input id="bRatio" type="number" step="5"><span class="u">%</span></div></div>
+            <div class="f"><label for="bMaxTerm">融資期間の上限</label><div class="in"><input id="bMaxTerm" type="number" step="1"><span class="u">年</span></div></div>
+          </div>
+          <p class="note">打診先の金融機関に確認した基準を入力してください。銀行ごとに大きく異なるため、ここでは値を仮置きしていません。参考として、査定空室率・経費率は各20%前後、審査金利は3.5〜4.5%、必要DSCRは1.2〜1.3倍とする例が多く見られます。</p>
+          <div class="lack" id="lack-bank" hidden></div>
+          <div id="body-bank">
+            <h3>融資見込み額</h3>
+            <div class="loan-box" id="loanBox"></div>
+            <h3>評価額の比較</h3>
+            <div class="bars" id="bankBars"></div>
+            <h3>積算評価</h3>
+            <div class="scroll"><table id="bankSeki"></table></div>
+            <h3>収益還元評価（直接還元法）</h3>
+            <div class="scroll"><table id="bankDirect"></table></div>
+            <h3>収益還元評価（DCF法・10年）</h3>
+            <div class="pairs" id="bankDcfSum"></div>
+            <div class="scroll" style="margin-top:8px"><table id="bankDcf"></table></div>
+            <h3>融資上限の内訳</h3>
+            <div class="scroll"><table id="bankLimits"></table></div>
+            <p class="note">積算重視型は担保評価と返済能力の低い方、収益重視型は収益還元評価と返済能力の低い方が上限です。黄色の行が上限を決めている項目です。審査では個人の属性（年収・金融資産・既存借入）も加味されるため、実際の融資額は前後します。</p>
+          </div>
+        </div>
+
+        <div data-panel="cmp" hidden>
+          <h2>保存した物件の比較</h2>
+          <div class="scroll"><table id="cmp"></table></div>
+          <p class="note" id="cmpEmpty">左の入力欄の下にある「保存」で物件を登録すると、ここに並びます。</p>
+        </div>
+      </section>
+
+      <p class="note">簡易モデルです（元利均等返済・定額法償却・中古は簡便法の耐用年数・不動産所得の赤字は他の所得と損益通算する前提）。土地取得分の借入利子の損益通算制限、消費税、修繕の資本的支出の区分は含みません。最終判断は税理士・金融機関の試算と照合してください。</p>
+    </main>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const YEAR = new Date().getFullYear();
+  const fin = Number.isFinite;
+
+  // ---------- 項目の定義 ----------
+  const LABEL = {
+    pname: "物件名", addr: "所在地", price: "物件価格", gpi: "満室想定年収", struct: "構造", age: "築年数", landArea: "土地面積", floorArea: "延床面積",
+    ptax: "固都税", otherRate: "諸費用率", bldg: "建物価格比率", equip: "設備比率", vac: "空室・滞納損", decl: "家賃下落", opex: "運営経費率",
+    repYear: "大規模修繕の時期", repAmt: "大規模修繕の費用", loan: "借入額", rate: "金利", term: "融資期間", taxr: "所得税+住民税率",
+    hold: "保有期間", cap: "売却時の表面利回り", sellc: "売却費用", mkt: "相場賃料単価", rosen: "路線価", repro: "再調達単価", landAdj: "土地評価の補正",
+    bLandBasis: "土地の評価基準", bkLand: "土地の掛目", bkBldg: "建物の掛目", bkInc: "収益評価の掛目", bVac: "査定空室率", bExp: "査定経費率",
+    bCap: "還元利回り", bDisc: "DCF割引率", bRate: "審査金利", bDscr: "必要DSCR", bRatio: "返済比率の上限", bMaxTerm: "融資期間の上限",
+  };
+  const NUM = ["price","gpi","struct","age","landArea","floorArea","ptax","otherRate","bldg","equip","vac","decl","opex","repYear","repAmt","loan","rate","term","taxr","hold","cap","sellc","mkt","rosen","repro","landAdj","bLandBasis","bkLand","bkBldg","bkInc","bVac","bExp","bCap","bDisc","bRate","bDscr","bRatio","bMaxTerm"];
+  const TXT = ["pname","addr"];
+  // 資料から読み取る物件の事実（読み込み時はいったん空にしてから反映）
+  const FACTS = ["pname","addr","price","gpi","struct","age","landArea","floorArea","ptax","rosen","bldg"];
+  // 未入力のとき計算上の扱いが明確な任意項目（推測ではなく「計上しない／補正しない」）
+  const OPTIONAL_ZERO = { equip: 0, repYear: 0, repAmt: 0, landAdj: 1 };
+  const GROUPS = [
+    { key: "core", name: "基本の収支", must: true, use: "すべての分析", ids: ["price","gpi","struct","age","ptax","vac","decl","opex","loan","rate","term"] },
+    { key: "tax", name: "税・減価償却", use: "税引後CF・帳簿分析・出口", ids: ["bldg","taxr"] },
+    { key: "exit", name: "出口", use: "出口戦略・IRR", ids: ["hold","cap","sellc"] },
+    { key: "seki", name: "積算", use: "積算価格・担保評価", ids: ["landArea","floorArea","rosen","repro"] },
+    { key: "rent", name: "賃料", use: "賃料の適正", ids: ["mkt"] },
+    { key: "bank", name: "銀行評価", use: "収益還元評価・融資見込み", ids: ["bLandBasis","bkLand","bkBldg","bkInc","bVac","bExp","bCap","bDisc","bRate","bDscr","bRatio","bMaxTerm","sellc"] },
+  ];
+
+  // 一般的な前提値（物件の事実ではなく、個人の一棟投資で広く使われる目安）。値を書き換えると「一般値」の印が外れます。
+  const GENERAL = {
+    vac: { v: 10, note: "空室・滞納で5〜10%程度を見込む例が多い（保守側の10%）" },
+    decl: { v: 1, note: "年1%下落（新築は10年間0%、11年目から適用）" },
+    opex: { v: 15, note: "管理費5%＋修繕・保険・共用費などで実効収入の15%前後（固都税は別）" },
+    hold: { v: 10, note: "長期譲渡（6年目以降）となり、融資残高も減る10年が比較の基準" },
+    cap: { v: null, note: "購入時の表面利回り＋0.5%（築年が進む分、利回りが上がる前提）" },
+    sellc: { v: 4, note: "仲介手数料3%＋6万円＋税と抵当権抹消費用等" },
+    repro: { v: null, note: "RC・SRC 20／重量鉄骨 18／軽量鉄骨・木造 15万円/㎡（構造に連動）" },
+    bLandBasis: { v: 1, note: "路線価を基準とする金融機関が多い" },
+    bkLand: { v: 80, note: "土地の担保掛目は70〜80%程度" },
+    bkBldg: { v: 70, note: "建物の担保掛目は60〜70%程度" },
+    bkInc: { v: 80, note: "収益評価の掛目は70〜80%程度" },
+    bVac: { v: 20, note: "金融機関の査定空室率は15〜20%程度" },
+    bExp: { v: 20, note: "金融機関の査定経費率は満室賃料の15〜25%程度" },
+    bCap: { v: 7, note: "地方中核都市の一棟物件で6〜8%程度。都心は4〜5%、地方は8%以上" },
+    bDisc: { v: 6.5, note: "還元利回り−0.5%程度" },
+    bRate: { v: 4, note: "審査金利（ストレス金利）は3.5〜4.5%程度" },
+    bDscr: { v: 1.2, note: "必要DSCRは1.2〜1.3倍程度" },
+    bRatio: { v: 50, note: "返済比率（返済額÷満室賃料）の上限は50%前後" },
+    bMaxTerm: { v: 35, note: "融資期間の上限は30〜35年程度" },
+  };
+  const genMode = {}; // true の項目は一般値を表示中
+  const reproFor = (st) => (st === 47 ? 20 : st === 34 ? 18 : st > 0 ? 15 : NaN);
+  function setGeneral(k) {
+    genMode[k] = true;
+    const g = GENERAL[k];
+    if (g.v !== null) $(k).value = g.v;
+    else $(k).value = "";
+    markGeneral();
+  }
+  const estMode = {}; // 推定で補完した項目 → 根拠
+  function markEst() {
+    NUM.concat(TXT).forEach((k) => {
+      const box = $(k).closest(".in"), f = $(k).closest(".f");
+      if (!box) return;
+      box.classList.toggle("est", !!estMode[k]);
+      if (estMode[k]) $(k).title = "推定：" + estMode[k];
+      const lab = f && f.querySelector("label");
+      if (!lab) return;
+      let tag = lab.querySelector(".etag");
+      if (estMode[k] && !tag) { tag = document.createElement("span"); tag.className = "etag"; tag.textContent = "推定"; lab.appendChild(tag); }
+      if (!estMode[k] && tag) tag.remove();
+    });
+  }
+  function markGeneral() {
+    Object.keys(GENERAL).forEach((k) => {
+      const box = $(k).closest(".in"), f = $(k).closest(".f");
+      box.classList.toggle("general", !!genMode[k]);
+      $(k).title = genMode[k] ? "一般値：" + GENERAL[k].note : "";
+      const lab = f && f.querySelector("label");
+      if (!lab) return;
+      let tag = lab.querySelector(".gtag");
+      if (genMode[k] && !tag) { tag = document.createElement("span"); tag.className = "gtag"; tag.textContent = "一般値"; lab.appendChild(tag); }
+      if (!genMode[k] && tag) tag.remove();
+    });
+  }
+  // 構造やNOIに連動する一般値を更新
+  function syncGeneral(p) {
+    if (genMode.repro) { const v = reproFor(p.struct); $("repro").value = fin(v) ? v : ""; p.repro = v; }
+    if (genMode.cap) {
+      if (fin(p.price) && fin(p.gpi) && p.price > 0) {
+        const v = Math.round((p.gpi / p.price * 100 + 0.5) * 10) / 10;
+        if (fin(v) && v > 0) { $("cap").value = v.toFixed(1); p.cap = v; }
+      } else { $("cap").value = ""; p.cap = NaN; }
+    }
+  }
+
+  const SAMPLE = {
+    pname: "サンプル 〇〇町RCマンション", addr: "大阪府箕面市（サンプル）", isNew: false,
+    price: 12000, gpi: 900, struct: 47, age: 22, landArea: 330, floorArea: 600, ptax: 60, otherRate: 4, bldg: 40, equip: 20,
+    vac: 10, decl: 1, opex: 15, repYear: 4, repAmt: 600, loan: 11000, rate: 2.2, term: 25, taxr: 33, hold: 10, cap: 8, sellc: 4,
+    mkt: 1900, rosen: 250, repro: 20, landAdj: 1, bLandBasis: 1, bkLand: 80, bkBldg: 70, bkInc: 80, bVac: 20, bExp: 20, bCap: 7, bDisc: 6.5,
+    bRate: 4, bDscr: 1.2, bRatio: 50, bMaxTerm: 35,
+    roll: Array.from({ length: 15 }, (_, i) => ({ room: `${Math.floor(i / 3) + 1}0${(i % 3) + 1}`, area: 25,
+      rent: [52000, 46000, 50000, 54000, 47000, 51000, 48000, 50000, 55000, 49000, 46000, 50000, 52000, 50000, 50000][i], occ: i === 4 || i === 11 ? "vacant" : "occ" })),
+  };
+
+  let isNew = null; // null = 未確定
+  let roll = [];
+  let srcMap = {}; // 資料から反映した項目 → 根拠
+
+  const fmt = (v, d = 0) => (fin(v) ? v.toLocaleString("ja-JP", { minimumFractionDigits: d, maximumFractionDigits: d }) : "—");
+  const pct = (v, d = 2) => (fin(v) ? (v * 100).toFixed(d) + "%" : "—");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const NA = "データ不足";
+
+  function read() {
+    const o = {};
+    NUM.forEach((k) => { const v = $(k).value; o[k] = v === "" ? NaN : parseFloat(v); });
+    TXT.forEach((k) => { o[k] = $(k).value; });
+    o.isNew = isNew;
+    o.finType = finType;
+    o.finSrc = finSrc;
+    if (isNew === true) o.age = 0;
+    o.roll = roll.map((r) => Object.assign({}, r));
+    return o;
+  }
+
+  function missing(p) {
+    const m = {};
+    GROUPS.forEach((g) => {
+      m[g.key] = g.ids.filter((k) => {
+        if (k === "age" && p.isNew === true) return false;
+        if ((k === "rate" || k === "term") && p.loan === 0) return false;
+        return !fin(p[k]);
+      }).map((k) => LABEL[k]);
+    });
+    if (p.isNew !== true && p.isNew !== false) m.core.unshift("新築／中古の区分");
+    if (!p.roll.some((r) => r.area > 0 && r.rent > 0)) m.rent.unshift("レントロール（部屋別の面積と賃料）");
+    const ok = {};
+    Object.keys(m).forEach((k) => (ok[k] = m[k].length === 0));
+    ok.tax = ok.tax && ok.core;
+    ok.exit = ok.exit && ok.tax;
+    ok.bank = ok.bank && ok.core;
+    return { m, ok };
+  }
+
+  // ---------- 計算 ----------
+  function usefulLife(legal, age, isNew) {
+    if (isNew || age <= 0) return legal;
+    if (age >= legal) return Math.max(2, Math.floor(legal * 0.2));
+    return Math.max(2, Math.floor(legal - age + age * 0.2));
+  }
+  function irr(flows) {
+    const npv = (x) => flows.reduce((s, c, t) => s + c / Math.pow(1 + x, t), 0);
+    let lo = -0.99, hi = 2;
+    if (npv(lo) * npv(hi) > 0) return NaN;
+    for (let i = 0; i < 200; i++) { const mid = (lo + hi) / 2; if (npv(lo) * npv(mid) <= 0) hi = mid; else lo = mid; }
+    return (lo + hi) / 2;
+  }
+  const YEARS = 36;
+
+  // 未入力は計算を止めるための目印として扱い、計算式には 0（任意項目は定義どおりの値）を入れる。
+  // 0 を入れた結果は ok フラグで表示側が使わないようにする。
+  function calcValues(p) {
+    const q = Object.assign({}, p);
+    NUM.forEach((k) => { if (!fin(q[k])) q[k] = k in OPTIONAL_ZERO ? OPTIONAL_ZERO[k] : 0; });
+    if (q.isNew === true) q.age = 0;
+    return q;
+  }
+
+  // ---------- 初期費用の内訳 ----------
+  // 税額は固定資産税評価額の概算から計算（評価証明が手元にあれば差し替え推奨）
+  const stampSale = (v) => (v > 50000 ? 16 : v > 10000 ? 6 : v > 5000 ? 3 : v > 1000 ? 1 : v > 500 ? 0.5 : v > 100 ? 0.1 : 0); // 軽減税率
+  const stampLoan = (v) => (v > 50000 ? 40 : v > 10000 ? 10 : v > 5000 ? 6 : v > 1000 ? 2 : v > 500 ? 1 : v > 100 ? 0.4 : 0);
+  function initCosts(p) {
+    const P = p.price || 0, loan = Math.max(0, p.loan || 0);
+    const items = [];
+    const add = (k, v, basis, grp) => items.push({ k, v, basis, grp });
+    const brokerage = p.isNew === false && P > 400 ? (P * 0.03 + 6) * 1.1 : 0;
+    // 固定資産税評価額の概算
+    const legal = p.struct || 0, age = p.isNew ? 0 : p.age || 0, repro = p.repro > 0 ? p.repro : reproFor(legal);
+    let landEval = NaN, bldgEval = NaN, evalBasis = "";
+    if (p.landArea > 0 && p.rosen > 0) landEval = (p.landArea * p.rosen * 1000 * 0.875) / 1e4;
+    if (p.floorArea > 0 && legal > 0 && fin(repro)) bldgEval = p.floorArea * repro * 0.5 * Math.max(0.2, 1 - (age / legal) * 0.8);
+    if (fin(landEval) && fin(bldgEval)) evalBasis = "評価額は路線価・延床面積からの概算";
+    else {
+      const tot = P * 0.6, br = p.bldg > 0 ? p.bldg / 100 : 0.4;
+      if (!fin(landEval)) landEval = tot * (1 - br);
+      if (!fin(bldgEval)) bldgEval = tot * br;
+      evalBasis = "評価額は価格の60%と仮定（路線価・面積の入力で精度が上がります）";
+    }
+    add("仲介手数料", brokerage, p.isNew === false ? "（価格×3%＋6万円）×1.1" : "新築・売主物件のため不要", "取引");
+    add("印紙税（売買契約）", stampSale(P), "契約金額に応じた軽減税率", "税");
+    add("登録免許税（所有権移転・土地）", landEval * 0.02, `土地評価額${fmt(landEval, 0)}万円×2.0%`, "税");
+    add("登録免許税（所有権移転・建物）", bldgEval * 0.02, `建物評価額${fmt(bldgEval, 0)}万円×2.0%`, "税");
+    add("不動産取得税（土地）", landEval * 0.5 * 0.03, "土地評価額×1/2（宅地特例）×3%", "税");
+    add("不動産取得税（建物）", bldgEval * 0.03, "建物評価額×3%（住宅の控除適用前）", "税");
+    add("司法書士報酬", 15, "移転・抵当権設定登記の報酬目安", "登記");
+    if (loan > 0) {
+      add("印紙税（金銭消費貸借契約）", stampLoan(loan), "借入額に応じた税額", "融資");
+      add("登録免許税（抵当権設定）", loan * 0.004, "借入額×0.4%", "融資");
+      add("融資事務手数料", loan * 0.011, "借入額×1.1%（金融機関により定額5〜11万円の場合も）", "融資");
+    }
+    add("火災・地震保険（5年分）", (p.floorArea > 0 ? p.floorArea : P / 30) * 0.15, p.floorArea > 0 ? "延床面積×1,500円/㎡（構造・地域で変動）" : "延床面積が未入力のため価格から概算", "その他");
+    add("固都税の日割り精算", (p.ptax || 0) * 0.5, "年税額の半年分（引渡し時期で変動）", "その他");
+    const other = items.filter((x) => x.k !== "仲介手数料").reduce((a, x) => a + x.v, 0);
+    return { items, brokerage, other, total: brokerage + other, landEval, bldgEval, evalBasis };
+  }
+  function renderInitCosts(a) {
+    const ic = a.ic, useRate = fin(a.src.otherRate);
+    const initTotal = a.brokerage + a.other;
+    $("icSub").textContent = useRate ? `諸費用は入力した諸費用率${a.src.otherRate}%で計算（下の内訳は参考）` : "諸費用は内訳から自動計算";
+    $("icBox").innerHTML = [
+      ["初期費用総額", fmt(initTotal, 0) + "万円", `物件価格の${pct(initTotal / a.P, 1)}（仲介手数料 ${fmt(a.brokerage, 0)}＋諸費用 ${fmt(a.other, 0)}）`],
+      ["購入総額", fmt(a.total, 0) + "万円", `物件価格 ${fmt(a.P, 0)}＋初期費用 ${fmt(initTotal, 0)}`],
+      ["必要な自己資金（現金）", fmt(a.equity, 0) + "万円", a.loan > 0 ? `購入総額 − 借入 ${fmt(a.loan, 0)}万円` : "借入なし（全額現金）", a.equity > 0 && a.equity < initTotal ? "" : ""],
+    ].map(([k, v, d]) => `<div><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></div>`).join("");
+    const grpName = { 取引: "取引", 税: "税金", 登記: "登記", 融資: "融資", その他: "その他" };
+    let h = `<tr><th>項目</th><th>区分</th><th>金額（万円）</th><th>計算の根拠</th></tr>`;
+    ic.items.forEach((x) => { h += `<tr><td style="font-family:var(--f-body)">${x.k}</td><td style="font-family:var(--f-body)">${grpName[x.grp]}</td>${c1(x.v, 1)}<td style="font-family:var(--f-body);text-align:left;white-space:normal">${x.basis}</td></tr>`; });
+    h += `<tr class="sum"><td>内訳の合計</td><td></td>${c1(ic.total, 1)}<td style="font-family:var(--f-body);text-align:left">${useRate ? `計算に使っている額：仲介 ${fmt(a.brokerage, 1)}＋諸費用率分 ${fmt(a.other, 1)}＝${fmt(initTotal, 1)}` : ""}</td></tr>`;
+    $("icTable").innerHTML = h;
+    $("icNote").textContent = `${ic.evalBasis}。登録免許税は本則2.0%で計算しています（土地の軽減税率1.5%が延長されていればその分安くなります）。不動産取得税は住宅の控除・軽減の適用前で、新築や一定の中古住宅はこれより下がります。保証会社の保証料（借入額の2%前後）が必要な融資では別途かかります。`;
+  }
+
+  // 家賃の推移：新築は10年間据え置き、11年目から下落率を適用。中古は1年目の翌年から適用
+  function rentFactor(p, y) {
+    const free = p.isNew === true ? 10 : 0;
+    return Math.pow(1 - (p.decl || 0) / 100, free ? Math.max(0, y - free) : y - 1);
+  }
+  function analyze(p0, over = {}) {
+    const src = Object.assign({}, p0, over);
+    const st = missing(src);
+    const p = calcValues(src);
+    const P = p.price;
+    const brokerage = p.isNew === false && P > 400 ? (P * 0.03 + 6) * 1.1 : 0;
+    const ic = initCosts(p);
+    const other = fin(src.otherRate) ? (P * p.otherRate) / 100 : ic.other;
+    const total = P + brokerage + other;
+    const loan = Math.max(0, p.loan);
+    const equity = total - loan;
+    const legal = p.struct;
+    const remainLegal = p.isNew ? legal : Math.max(0, legal - p.age);
+    const lifeS = usefulLife(legal, p.age, p.isNew);
+    const lifeE = usefulLife(15, p.age, p.isNew);
+    const bldgBasis = (total * p.bldg) / 100;
+    const equipBasis = (bldgBasis * p.equip) / 100;
+    const structBasis = bldgBasis - equipBasis;
+    const landBasis = total - bldgBasis;
+    const depS = lifeS > 0 ? structBasis / lifeS : 0;
+    const depE = lifeE > 0 ? equipBasis / lifeE : 0;
+    const r = p.rate / 100 / 12, n = Math.round(p.term * 12);
+    const pm = n <= 0 || loan <= 0 ? 0 : r > 0 ? (loan * r) / (1 - Math.pow(1 + r, -n)) : loan / n;
+    const H = Math.max(1, Math.min(YEARS - 1, Math.round(p.hold) || 1));
+
+    let bal = loan, month = 0, accDep = 0, cum = 0, cumB = 0;
+    const rows = [];
+    for (let y = 1; y <= YEARS; y++) {
+      let interest = 0, principal = 0, ds = 0;
+      for (let m = 0; m < 12; m++) {
+        if (month < n && bal > 1e-9) {
+          const i = bal * r, pr = Math.min(bal, pm - i);
+          interest += i; principal += pr; ds += i + pr; bal -= pr;
+        }
+        month++;
+      }
+      const gpi = p.gpi * rentFactor(p, y);
+      const egi = gpi * (1 - p.vac / 100);
+      const opex = (egi * p.opex) / 100 + p.ptax;
+      const noi = egi - opex;
+      const repair = p.repAmt > 0 && y === Math.round(p.repYear) ? p.repAmt : 0;
+      const dep = (y <= lifeS ? depS : 0) + (y <= lifeE ? depE : 0);
+      accDep += dep;
+      const btcf = noi - repair - ds;
+      const taxable = noi - repair - interest - dep;
+      const tax = (taxable * p.taxr) / 100;
+      const atcf = btcf - tax;
+      cum += atcf; cumB += btcf;
+      rows.push({ y, gpi, egi, opex, noi, repair, ds, interest, principal, bal: Math.max(0, bal), dep, accDep, btcf, taxable, tax, atcf, cum, cumB,
+        bookB: bldgBasis - accDep, bookL: landBasis });
+    }
+    const a = { ic, p, src, ok: st.ok, miss: st.m, P, brokerage, other, total, loan, equity, legal, remainLegal, lifeS, lifeE, depS, depE, bldgBasis, equipBasis, landBasis, H, rows, pm };
+    a.sale = (h, capPct) => saleAt(a, h, capPct);
+    const s = a.sale(H, p.cap);
+    const y1 = rows[0];
+    Object.assign(a, {
+      y1, s,
+      surface: p.gpi / P,
+      fcr: y1.noi / total,
+      k: loan > 0 ? y1.ds / loan : 0,
+      ccr: equity > 0 ? y1.btcf / equity : NaN,
+      dscr: y1.ds > 0 ? y1.noi / y1.ds : Infinity,
+      ber: (y1.opex + y1.ds) / y1.gpi,
+      ltv: loan / P,
+      irr: st.ok.exit ? s.irr : NaN,
+      multiple: st.ok.exit && equity > 0 ? (rows[H - 1].cum + s.net) / equity : NaN,
+    });
+    a.deadCross = st.ok.tax ? (rows.find((x) => x.ds > 0 && x.principal > x.dep) || {}).y || null : null;
+    a.taxOver = st.ok.tax ? (rows.slice(0, H).find((x) => x.taxable > 0 && x.tax > x.btcf && x.btcf > 0) || {}).y || null : null;
+    return a;
+  }
+
+  function saleAt(a, h, capPct) {
+    const R = a.rows, p = a.p;
+    const price = capPct > 0 ? R[h].gpi / (capPct / 100) : NaN; // 売却翌年の満室年収÷表面利回り
+    const cost = (price * p.sellc) / 100;
+    const book = a.total - R[h - 1].accDep;
+    const gain = price - cost - book;
+    const longTerm = h >= 6;
+    const tax = Math.max(0, gain) * (longTerm ? 0.20315 : 0.3963);
+    const bal = R[h - 1].bal;
+    const net = price - cost - bal - tax;
+    const flows = [-a.equity, ...R.slice(0, h).map((x) => x.atcf)];
+    flows[h] += net;
+    return { h, price, cost, book, gain, longTerm, tax, bal, net, cum: R[h - 1].cum, irr: a.equity > 0 && fin(net) ? irr(flows) : NaN,
+      remain: Math.max(0, a.remainLegal - h), total: R[h - 1].cum + net };
+  }
+
+  function rentStats(p) {
+    const rr = p.roll.filter((x) => x.area > 0 && x.rent > 0);
+    const n = rr.length;
+    if (!n) return null;
+    const area = rr.reduce((s, x) => s + x.area, 0);
+    const rent = rr.reduce((s, x) => s + x.rent, 0);
+    const occ = rr.filter((x) => x.occ !== "vacant");
+    const occRent = occ.reduce((s, x) => s + x.rent, 0);
+    const mkt = fin(p.mkt) && p.mkt > 0 ? p.mkt : NaN;
+    const items = p.roll.map((x) => {
+      const unit = x.area > 0 && x.rent > 0 ? x.rent / x.area : NaN;
+      const dev = fin(mkt) && fin(unit) ? unit / mkt - 1 : NaN;
+      return Object.assign({}, x, { unit, dev });
+    });
+    const valid = items.filter((x) => fin(x.unit));
+    const over = valid.filter((x) => x.dev > 0.1 && x.occ !== "vacant");
+    const under = valid.filter((x) => x.dev < -0.1);
+    const mktGpi = fin(mkt) ? (area * mkt * 12) / 1e4 : NaN;
+    const overLoss = fin(mkt) ? (over.reduce((s, x) => s + (x.rent - x.area * mkt), 0) * 12) / 1e4 : NaN;
+    return { n, area, rent, occN: occ.length, occRate: occ.length / n, unitAvg: rent / area, items, over, under, mktGpi, mkt,
+      rollGpi: (rent * 12) / 1e4, occGpi: (occRent * 12) / 1e4, overLoss };
+  }
+
+  function sekisan(a) {
+    const p = a.p;
+    const land = (p.landArea * p.rosen * 1000 * p.landAdj) / 1e4;
+    const bRatio = a.legal > 0 ? a.remainLegal / a.legal : 0;
+    const bldg = p.floorArea * p.repro * bRatio;
+    const total = land + bldg;
+    return { ok: a.ok.seki && a.ok.core, land, bldg, total, bRatio, ratio: total / p.price, loanCover: a.loan > 0 ? total / a.loan : Infinity,
+      income: a.ok.exit || (fin(a.src.cap) && a.ok.core) ? a.y1.gpi / (p.cap / 100) : NaN };
+  }
+
+  // ---------- 銀行評価 ----------
+  const pvAnnuity = (annual, ratePct, years) => {
+    const r = ratePct / 100 / 12, n = Math.round(years * 12), pm = annual / 12;
+    if (n <= 0 || pm <= 0) return 0;
+    return r > 0 ? (pm * (1 - Math.pow(1 + r, -n))) / r : pm * n;
+  };
+  function bankEval(a, rs, sk) {
+    const p = a.p;
+    const hasLand = sk.ok;
+    const land = (p.landArea * p.rosen * 1000 * p.landAdj * (p.bLandBasis || 1)) / 1e4;
+    const bldg = sk.bldg;
+    const seki = land + bldg;
+    const tLand = (land * p.bkLand) / 100, tBldg = (bldg * p.bkBldg) / 100, tanpo = tLand + tBldg;
+    const useMkt = !!(rs && fin(rs.mktGpi) && rs.mktGpi < p.gpi);
+    const gpi = useMkt ? rs.mktGpi : p.gpi;
+    const vacLoss = (gpi * p.bVac) / 100, exp = (gpi * p.bExp) / 100;
+    const noi = gpi - vacLoss - exp;
+    const direct = p.bCap > 0 ? noi / (p.bCap / 100) : NaN;
+    const directT = (direct * p.bkInc) / 100;
+    const N = 10, d = p.bDisc / 100, tcap = (p.bCap + 0.5) / 100;
+    const dcfRows = [];
+    let pvSum = 0;
+    for (let t = 1; t <= N; t++) {
+      const nn = noi * rentFactor(p, t), df = 1 / Math.pow(1 + d, t);
+      pvSum += nn * df; dcfRows.push({ t, noi: nn, df, pv: nn * df });
+    }
+    const revNoi = noi * rentFactor(p, N + 1);
+    const rev = (revNoi / tcap) * (1 - p.sellc / 100);
+    const revPv = rev / Math.pow(1 + d, N);
+    const dcf = pvSum + revPv;
+    const termMax = Math.max(0, Math.min(p.bMaxTerm, p.isNew ? a.legal : a.remainLegal));
+    const dscrLoan = p.bDscr > 0 ? pvAnnuity(noi / p.bDscr, p.bRate, termMax) : 0;
+    const ratioLoan = pvAnnuity((p.gpi * p.bRatio) / 100, p.bRate, termMax);
+    const capLoan = Math.min(dscrLoan, ratioLoan);
+    const sekiType = hasLand ? Math.min(tanpo, capLoan) : NaN;
+    const incType = Math.min(directT, capLoan);
+    const best = Math.max(fin(sekiType) ? sekiType : 0, incType);
+    const limits = [
+      { k: "担保評価（積算×掛目）", v: tanpo, type: "seki", note: `土地${p.bkLand}%・建物${p.bkBldg}%`, na: !hasLand },
+      { k: "収益還元評価×掛目", v: directT, type: "inc", note: `直接還元 ${fmt(direct, 0)}万円×${p.bkInc}%` },
+      { k: "返済能力（DSCR基準）", v: dscrLoan, type: "both", note: `審査金利${p.bRate}%・${termMax}年・DSCR${p.bDscr}倍` },
+      { k: "返済能力（返済比率基準）", v: ratioLoan, type: "both", note: `満室賃料の${p.bRatio}%まで返済` },
+    ];
+    return { ok: a.ok.bank, hasLand, land, bldg, seki, tLand, tBldg, tanpo, useMkt, gpi, vacLoss, exp, noi, direct, directT,
+      N, dcfRows, pvSum, rev, revPv, tcap, dcf, termMax, dscrLoan, ratioLoan, capLoan, sekiType, incType, best, limits,
+      short: Math.max(0, a.loan - best), needEquity: a.total - best };
+  }
+
+  // ---------- 判定 ----------
+  function exitYears() { return [3, 5, 6, 7, 10, 12, 15, 20, 25, 30]; }
+  function bestExit(a) {
+    if (!a.ok.exit) return null;
+    let best = null;
+    exitYears().forEach((h) => { const s = a.sale(h, a.p.cap); if (fin(s.irr) && (!best || s.irr > best.irr)) best = s; });
+    return best;
+  }
+  function judge(a, rs, sk, bk) {
+    const al = [];
+    const add = (lv, t) => al.push({ lv, t });
+    const p = a.p, ok = a.ok;
+    if (p.isNew === false && a.loan > 0 && p.term > a.remainLegal) add("bad", `<b>融資期間${p.term}年が残存法定耐用年数${a.remainLegal}年を超えています。</b>多くの金融機関は残存年数を上限とするため、この条件が出ない可能性があります。`);
+    if (a.loan > 0 && a.dscr < 1.0) add("bad", `<b>DSCR ${a.dscr.toFixed(2)}</b>：家賃収入で返済を賄えていません。`);
+    else if (a.loan > 0 && a.dscr < 1.3) add("warn", `<b>DSCR ${a.dscr.toFixed(2)}</b>：金融機関が求める目安1.3を下回り、空室や金利上昇への耐性が薄い状態です。`);
+    if (a.ber > 0.8) add("bad", `<b>損益分岐入居率 ${pct(a.ber, 1)}</b>：入居率がこれを下回ると持ち出しです。`);
+    else if (a.ber > 0.7) add("warn", `<b>損益分岐入居率 ${pct(a.ber, 1)}</b>：安全圏の目安70%を超えています。`);
+    if (a.loan > 0 && a.fcr < a.k) add("bad", `<b>逆レバレッジ</b>：総収益率(FCR) ${pct(a.fcr)} がローン定数(K) ${pct(a.k)} を下回り、借りるほど自己資金の利回りが下がります。`);
+    if (a.loan > 0) {
+      const up = analyze(a.src, { rate: p.rate + 1 });
+      if (a.y1.btcf > 0 && up.y1.btcf < 0) add("warn", `<b>金利+1%で初年度CFが ${fmt(up.y1.btcf, 0)}万円 の赤字に転じます。</b>`);
+    }
+    if (ok.tax) {
+      if (a.deadCross) add(a.deadCross <= a.H ? "warn" : "info", `<b>デッドクロス：${a.deadCross}年目</b>から元金返済が減価償却を上回り、帳簿上の黒字に対して手元資金が減る局面に入ります。`);
+      if (a.taxOver) add("warn", `<b>${a.taxOver}年目に税額が税引前CFを上回ります。</b>売却か法人化を検討する時期の目安です。`);
+    }
+    if (ok.exit) {
+      if (!a.s.longTerm) add("warn", `<b>保有${a.H}年の売却は短期譲渡（39.63%）。</b>6年目以降なら長期譲渡（20.315%）です。`);
+      const buyS = p.gpi / p.price;
+      if (p.cap > buyS * 100 + 1.5) add("warn", `<b>売却時の表面利回り${p.cap}%が購入時の表面利回り${pct(buyS)}より大幅に高い想定です。</b>売却価格が大きく下がる前提のため、IRRが低く出ます。`);
+      const best = bestExit(a);
+      if (best && best.h !== a.H) add("info", `<b>出口：${best.h}年目の売却がIRR最大（${pct(best.irr)}）</b>です。現在の想定は${a.H}年保有（${pct(a.irr)}）。`);
+      if (a.s.remain < 10) add("warn", `<b>売却時の残存耐用年数が${a.s.remain}年</b>。買主が長期融資を組みにくく、売りにくくなる可能性があります。`);
+      const under = a.rows.slice(0, a.H).find((x) => a.sale(x.y, p.cap).price < x.bal);
+      if (under) add("warn", `<b>${under.y}年目は想定時価が残債を下回ります（債務超過）。</b>この期間は売っても借入を返しきれません。`);
+    }
+    if (rs) {
+      if (fin(rs.mkt)) {
+        if (rs.over.length) add("warn", `<b>相場より10%以上高い部屋が${rs.over.length}室</b>あります。退去で相場に戻ると年 ${fmt(rs.overLoss, 0)}万円 の減収です。`);
+        if (Math.abs(rs.mktGpi / p.gpi - 1) > 0.05) add(rs.mktGpi < p.gpi ? "warn" : "info", `<b>相場賃料での満室年収は ${fmt(rs.mktGpi, 0)}万円</b>（入力値 ${fmt(p.gpi, 0)}万円 と ${pct(rs.mktGpi / p.gpi - 1, 1)} の差）。`);
+      }
+      if (1 - rs.occRate > p.vac / 100 + 0.05) add("warn", `<b>現況の空室率 ${pct(1 - rs.occRate, 1)}</b> が想定 ${p.vac}% より高い状態です。`);
+      if (Math.abs(rs.rollGpi / p.gpi - 1) > 0.03) add("info", `<b>レントロール合計 ${fmt(rs.rollGpi, 0)}万円 と満室想定年収 ${fmt(p.gpi, 0)}万円 が一致しません。</b>資料の数字を確認してください。`);
+    }
+    if (sk.ok) {
+      if (sk.ratio < 0.7) add("warn", `<b>積算評価 ${fmt(sk.total, 0)}万円 は価格の${pct(sk.ratio, 0)}</b>。積算重視の金融機関では融資額が伸びにくい物件です。`);
+      else if (sk.ratio >= 1) add("ok", `<b>積算評価 ${fmt(sk.total, 0)}万円 が価格を上回ります（${pct(sk.ratio, 0)}）。</b>`);
+    }
+    if (bk.ok) {
+      if (bk.termMax <= 0 && a.loan > 0) add("bad", "<b>法定耐用年数が残っていないため、耐用年数基準の金融機関では融資期間が取れません。</b>");
+      else if (a.loan > bk.best * 1.02) add("bad", `<b>借入額 ${fmt(a.loan, 0)}万円 は銀行評価の融資見込み ${fmt(bk.best, 0)}万円 を上回ります。</b>自己資金が約${fmt(bk.short, 0)}万円多く必要になる可能性があります。`);
+      else if (a.loan > 0) add("ok", `<b>借入額 ${fmt(a.loan, 0)}万円 は銀行評価の融資見込み ${fmt(bk.best, 0)}万円 の範囲内です。</b>`);
+    }
+    if (a.loan > 0 && a.equity <= 0) add("info", "<b>フルローン以上</b>のため自己資金利回り・IRRは計算できません。");
+    if (a.loan > 0 && a.src.finType === "var") add("warn", `<b>変動金利です。</b>金利+1%で年間返済は約${fmt(analyze(a.src, { rate: p.rate + 1 }).y1.ds - a.y1.ds, 0)}万円増えます。感応度表で耐えられる金利を確認してください。`);
+    if (a.loan > 0 && a.src.finSrc === "rough") add("info", "<b>融資条件は金融機関への打診前の目安です。</b>打診で条件が出たら置き換えてください。");
+    if (p.isNew) add("info", "新築は売主物件のため仲介手数料は不要です。新築時の家賃は数年で下がりやすいため、家賃下落率の根拠を確認してください。");
+    if (p.isNew === false && p.age >= a.legal) add("warn", `<b>法定耐用年数を経過した物件です。</b>償却は${a.lifeS}年で終わり、融資期間も短くなりがちです。`);
+    extNotes.forEach((t) => add("warn", `<b>資料記載：</b>${esc(t)}`));
+    const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
+    const ests = Object.keys(estMode).filter((k) => estMode[k] && k[0] !== "_");
+    if (ests.length) add("warn", `<b>推定値で計算している項目：</b>${ests.map((k) => k === "isNew" ? "新築／中古" : LABEL[k]).join("・")}。資料・金融機関・現地で確認して置き換えてください（入力欄の「推定」の印にカーソルを合わせると根拠が出ます）。`);
+    if (gens.length) add("info", `<b>一般値で計算している前提：</b>${gens.map((k) => LABEL[k]).join("・")}。物件の実態や金融機関の基準が分かれば置き換えてください。`);
+    const lackGroups = GROUPS.filter((g) => !a.ok[g.key]).map((g) => g.name);
+    if (lackGroups.length) add("info", `<b>データ不足で判定していない分野：</b>${lackGroups.join("・")}。判定はこれらを含みません。`);
+    const order = { bad: 0, warn: 1, info: 2, ok: 3 };
+    al.sort((x, y) => order[x.lv] - order[y.lv]);
+    const nBad = al.filter((x) => x.lv === "bad").length, nWarn = al.filter((x) => x.lv === "warn").length;
+    const verdict = nBad ? ["bad", "見送り・条件交渉"] : nWarn >= 3 ? ["warn", "条件付きで検討"] : ["ok", "前向きに検討"];
+    return { al, verdict, nBad, nWarn };
+  }
+  const chipLabel = { bad: "要対応", warn: "注意", info: "確認", ok: "良好" };
+
+  // ---------- スコア ----------
+  const lin = (v, bad, good) => (fin(v) ? Math.max(0, Math.min(10, ((v - bad) / (good - bad)) * 10)) : NaN);
+  function scoreAll(a, rs, sk, bk) {
+    const p = a.p, H = a.H, ok = a.ok;
+    const hasLoan = a.loan > 0;
+    const minRowB = a.rows.slice(0, H).reduce((x, y) => (y.btcf < x.btcf ? y : x));
+    const minRowA = a.rows.slice(0, H).reduce((x, y) => (y.atcf < x.atcf ? y : x));
+    const buyNoi = a.y1.noi / p.price;
+    const underYears = ok.exit ? a.rows.slice(0, H).filter((r) => a.sale(r.y, p.cap).price < r.bal).length : NaN;
+    const lossFree = ok.tax ? a.rows.slice(0, H).filter((r) => r.taxable > 0 && r.atcf < 0).length : NaN;
+    const hasMkt = !!(rs && fin(rs.mkt));
+    const up2 = hasLoan ? analyze(a.src, { rate: p.rate + 2 }) : null;
+    const it = (name, val, pts, crit, comment, na) => {
+      const isNa = !!na || !fin(pts);
+      return { name, val: isNa && (val === "—" || val == null) ? NA : val, pts: isNa ? NaN : Math.round(pts * 10) / 10, crit, comment: isNa ? (typeof na === "string" ? na : "必要なデータが未入力のため採点していません") : comment, na: isNa };
+    };
+    const need = (key) => (ok[key] ? false : `${GROUPS.find((g) => g.key === key).name}のデータ不足：${a.miss[key].join("、")}`);
+    const cats = [
+      { key: "yield", name: "収益性", weight: 20, items: [
+        it("表面利回り", pct(a.surface), lin(a.surface, 0.05, 0.10), "5%→0点／10%→10点", a.surface >= 0.08 ? "高水準。家賃設定が実態に合っているか要確認" : a.surface < 0.06 ? "低く、経費と返済で利益が残りにくい" : "標準的"),
+        it("実質利回り（FCR）", pct(a.fcr), lin(a.fcr, 0.035, 0.07), "3.5%→0点／7%→10点", a.fcr < 0.045 ? "経費控除後の収益力が弱い" : "経費を引いても収益が残る"),
+        it("自己資金利回り（CCR）", pct(a.ccr), lin(a.ccr, 0, 0.10), "0%→0点／10%→10点", a.ccr < 0.03 ? "投じた自己資金に対して手残りが少ない" : "自己資金の効率は良好", a.equity <= 0 && "自己資金ゼロ以下のため算出できません"),
+        it("イールドギャップ（FCR−K）", pct(a.fcr - a.k), lin(a.fcr - a.k, -0.01, 0.025), "−1%→0点／+2.5%→10点", a.fcr < a.k ? "逆レバレッジ。借入が収益を圧迫" : "借入が自己資金利回りを押し上げている", !hasLoan && "借入なしのため対象外"),
+      ]},
+      { key: "safe", name: "安全性", weight: 20, items: [
+        it("DSCR", fin(a.dscr) ? a.dscr.toFixed(2) : "—", lin(a.dscr, 1.0, 1.5), "1.0→0点／1.5→10点", a.dscr < 1.3 ? "返済余力が薄い。金融機関の目安1.3未満" : "返済余力は十分", !hasLoan && "借入なしのため対象外"),
+        it("損益分岐入居率", pct(a.ber, 1), lin(a.ber, 0.9, 0.6), "90%→0点／60%→10点", a.ber > 0.8 ? "少しの空室で持ち出しになる" : "空室への耐性あり"),
+        it("金利+2%時のDSCR", up2 && fin(up2.dscr) ? up2.dscr.toFixed(2) : "—", up2 ? lin(up2.dscr, 0.9, 1.3) : NaN, "0.9→0点／1.3→10点", up2 && up2.dscr < 1 ? "金利上昇で返済が家賃を上回る" : "金利上昇に耐えられる", !hasLoan && "借入なしのため対象外"),
+        it("融資期間と残存耐用年数", `${p.term}年／${a.remainLegal}年`, p.isNew || p.term <= a.remainLegal ? 10 : lin(p.term - a.remainLegal, 10, 0), "残存以内→10点／10年超過→0点", p.term > a.remainLegal ? "残存年数を超える融資は通りにくい" : "金融機関の基準内", !hasLoan && "借入なしのため対象外"),
+      ]},
+      { key: "cf", name: "CF", weight: 15, items: [
+        it("初年度 税引前CF率", pct(a.y1.btcf / p.gpi, 1), lin(a.y1.btcf / p.gpi, 0, 0.3), "満室年収比 0%→0点／30%→10点", a.y1.btcf < 0 ? "初年度から持ち出し" : "初年度の手残り"),
+        it("初年度 税引後CF率", pct(a.y1.atcf / p.gpi, 1), lin(a.y1.atcf / p.gpi, 0, 0.25), "満室年収比 0%→0点／25%→10点", a.y1.atcf < 0 ? "税引後で持ち出し" : "税引後も手残りあり", need("tax")),
+        it("最も苦しい年のCF", ok.tax ? `${minRowA.y}年目 ${fmt(minRowA.atcf, 0)}万（税引後）` : `${minRowB.y}年目 ${fmt(minRowB.btcf, 0)}万（税引前）`, lin((ok.tax ? minRowA.atcf : minRowB.btcf) / p.gpi, -0.05, 0.15), "満室年収比 −5%→0点／15%→10点", (ok.tax ? minRowA.atcf : minRowB.btcf) < 0 ? "資金が流出する年がある。予備資金が必要" : "保有中に赤字の年なし"),
+        it(`${H}年累計CF÷自己資金`, ok.tax && a.equity > 0 ? pct(a.rows[H - 1].cum / a.equity, 0) : "—", lin(a.rows[H - 1].cum / a.equity, 0, 1), "0%→0点／100%→10点", a.rows[H - 1].cum >= a.equity ? "保有中のCFだけで自己資金を回収" : "自己資金の回収は売却頼み", need("tax") || need("exit") || (a.equity <= 0 && "自己資金ゼロ以下のため対象外")),
+      ]},
+      { key: "exit", name: "出口", weight: 15, items: [
+        it("IRR（税引後）", pct(a.irr), lin(a.irr, 0, 0.10), "0%→0点／10%→10点", a.irr < 0.04 ? "リスクに見合うか他の運用先と比較を" : "投資効率は良好", need("exit") || (a.equity <= 0 && "自己資金ゼロ以下のため対象外")),
+        it("自己資金倍率", fin(a.multiple) ? a.multiple.toFixed(2) + "倍" : "—", lin(a.multiple, 1, 2.5), "1.0倍→0点／2.5倍→10点", a.multiple < 1 ? "売却しても自己資金を回収できない" : "自己資金が増えて戻る", need("exit") || (a.equity <= 0 && "自己資金ゼロ以下のため対象外")),
+        it("売却時の残存耐用年数", `${a.s.remain}年`, lin(a.s.remain, 0, 20), "0年→0点／20年→10点", a.s.remain < 10 ? "買主が長期融資を組みにくく売りにくい" : "買主も融資を組みやすい", !fin(a.src.hold) && "保有期間が未入力"),
+        it("売却時利回りの妥当性", `表面${p.cap}%（購入時 ${pct(a.surface)}）`, lin(p.cap - a.surface * 100, 2.5, 0.3), "購入時+2.5%→0点／+0.3%→10点", p.cap < a.surface * 100 ? "購入時より低い利回りで売れる楽観的な想定" : p.cap - a.surface * 100 > 1.5 ? "大幅な値下がりを想定" : "保守的な想定", !fin(a.src.cap) && "売却時の表面利回りが未入力"),
+      ]},
+      { key: "book", name: "帳簿・税", weight: 10, items: [
+        it("デッドクロスの時期", a.deadCross ? `${a.deadCross}年目` : "なし", a.deadCross ? lin(a.deadCross, 3, 15) : 10, "3年目→0点／15年目→10点", a.deadCross && a.deadCross <= H ? "保有期間中に帳簿と資金が逆転する" : "保有期間中は問題なし", need("tax") || (!hasLoan && "借入なしのため対象外")),
+        it("債務超過の年数", fin(underYears) ? `${underYears}年／${H}年` : "—", lin(underYears / H, 1, 0), "全期間→0点／なし→10点", underYears ? "この期間は売却しても借入を返しきれない" : "保有中いつでも売却で完済できる", need("exit")),
+        it("黒字なのに資金が減る年", fin(lossFree) ? `${lossFree}年` : "—", lin(lossFree / H, 0.5, 0), "保有期間の半分→0点／なし→10点", lossFree ? "税負担で手元資金が減る年がある" : "税負担による資金流出なし", need("tax")),
+      ]},
+      { key: "rent", name: "賃料", weight: 10, items: [
+        it("平均賃料と相場の差", hasMkt ? `${rs.unitAvg / rs.mkt - 1 > 0 ? "+" : ""}${pct(rs.unitAvg / rs.mkt - 1, 1)}` : "—", hasMkt ? lin(rs.unitAvg / rs.mkt - 1, 0.15, -0.02) : NaN, "+15%→0点／−2%以下→10点", hasMkt && rs.unitAvg > rs.mkt * 1.05 ? "相場より高く、入替時に下がる可能性" : "相場並み以下で下落リスクは小さい", need("rent")),
+        it("相場より高い部屋の割合", hasMkt ? pct(rs.over.length / rs.n, 0) : "—", hasMkt ? lin(rs.over.length / rs.n, 0.5, 0) : NaN, "50%→0点／0%→10点", hasMkt && rs.over.length ? `${rs.over.length}室が退去時に減額の見込み` : "減額リスクの高い部屋なし", need("rent")),
+        it("現況の入居率", rs ? pct(rs.occRate, 0) : "—", rs ? lin(rs.occRate, 0.7, 0.95) : NaN, "70%→0点／95%→10点", rs && rs.occRate < 0.85 ? "空室が多い。原因（賃料・設備・立地）を確認" : "入居は安定", !rs && "レントロールが未入力"),
+      ]},
+      { key: "seki", name: "積算・銀行評価", weight: 10, items: [
+        it("借入額÷銀行の融資見込み", bk.ok && hasLoan ? pct(a.loan / bk.best, 0) : "—", lin(a.loan / bk.best, 1.3, 0.9), "130%→0点／90%以下→10点", a.loan > bk.best ? `銀行評価より約${fmt(bk.short, 0)}万円多く借りる想定` : "銀行評価の範囲内で借りられる見込み", need("bank") || (!hasLoan && "借入なしのため対象外")),
+        it("積算価格÷物件価格", sk.ok ? pct(sk.ratio, 0) : "—", lin(sk.ratio, 0.5, 1.0), "50%→0点／100%→10点", sk.ratio < 0.7 ? "担保評価が出にくく自己資金が多く要る" : "担保評価は出やすい", need("seki")),
+        it("積算価格÷借入額", sk.ok && hasLoan ? pct(sk.loanCover, 0) : "—", lin(sk.loanCover, 0.6, 1.1), "60%→0点／110%→10点", sk.loanCover < 1 ? "借入額が担保評価を上回る" : "担保で借入をカバー", need("seki") || (!hasLoan && "借入なしのため対象外")),
+        it("銀行の収益還元評価÷物件価格", bk.ok ? pct(bk.direct / p.price, 0) : "—", lin(bk.direct / p.price, 0.6, 1.0), "60%→0点／100%→10点", bk.direct < p.price * 0.8 ? "銀行の収益評価では割高" : "銀行の収益評価でも価格に見合う", need("bank")),
+        it("土地評価の割合", sk.ok ? pct(sk.land / sk.total, 0) : "—", lin(sk.land / sk.total, 0.2, 0.6), "20%→0点／60%→10点", sk.land / sk.total < 0.35 ? "価値の多くが目減りする建物" : "土地が価値を下支え", need("seki")),
+      ]},
+    ];
+    let wsum = 0, acc = 0, nItems = 0, nScored = 0;
+    cats.forEach((c) => {
+      const okItems = c.items.filter((x) => !x.na);
+      nItems += c.items.length; nScored += okItems.length;
+      c.na = okItems.length === 0;
+      c.score = c.na ? NaN : Math.round((okItems.reduce((s, x) => s + x.pts, 0) / okItems.length) * 10);
+      if (!c.na) { wsum += c.weight; acc += c.score * c.weight; }
+    });
+    const total = wsum ? Math.round(acc / wsum) : NaN;
+    const grade = !fin(total) ? "—" : total >= 80 ? "A" : total >= 65 ? "B" : total >= 50 ? "C" : total >= 35 ? "D" : "E";
+    const gradeText = { A: "優良", B: "良好", C: "普通", D: "要改善", E: "見送り推奨", "—": "採点不可" }[grade];
+    return { total, grade, gradeText, cats, nItems, nScored, coverage: wsum };
+  }
+  const mark = (pts) => (pts >= 8 ? ["◎", "ok"] : pts >= 6 ? ["○", "info"] : pts >= 4 ? ["△", "warn"] : ["×", "bad"]);
+  const gcls = (g) => ({ A: "g-a", B: "g-b", C: "g-c", D: "g-d", E: "g-d" }[g] || "g-c");
+  function renderScore(sc) {
+    const R = 62, C = 2 * Math.PI * R, f = fin(sc.total) ? sc.total / 100 : 0;
+    const col = sc.total >= 65 ? "var(--ok)" : sc.total >= 50 ? "var(--accent)" : sc.total >= 35 ? "var(--warn)" : "var(--neg)";
+    $("scoreSub").textContent = `${sc.nItems}項目中${sc.nScored}項目を採点（データ不足の項目は除外）。採点できた分野の重みは合計${sc.coverage}／100`;
+    $("scoreBig").innerHTML = `<svg viewBox="0 0 150 150" role="img" aria-label="総合スコア ${fin(sc.total) ? sc.total : "なし"}">
+      <circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--line)" stroke-width="10"/>
+      <circle cx="75" cy="75" r="${R}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C * f} ${C}" transform="rotate(-90 75 75)"/>
+      <text x="75" y="84" text-anchor="middle" class="num">${fin(sc.total) ? sc.total : "—"}</text><text x="75" y="104" text-anchor="middle" class="of">/ 100</text></svg>
+      <span class="grade ${gcls(sc.grade)}">${sc.grade}　${sc.gradeText}${fin(sc.total) && sc.coverage < 100 ? "（暫定）" : Object.keys(estMode).some((k) => k[0] !== "_" && estMode[k]) ? "（推定含む）" : ""}</span>`;
+    $("cats").innerHTML = sc.cats.map((c) => {
+      const v = c.na ? 0 : c.score;
+      const bc = v >= 65 ? "var(--ok)" : v >= 50 ? "var(--accent)" : v >= 35 ? "var(--warn)" : "var(--neg)";
+      return `<div class="cat-row"><span>${c.name}</span><div class="bar-track"><div class="bar-fill" style="width:${v}%;background:${bc}"></div></div><span class="pt">${c.na ? NA : v + "点"}</span><span class="w">重み${c.weight}</span></div>`;
+    }).join("");
+    let h = `<tr><th>項目</th><th>評価</th><th>値</th><th>点数</th><th>コメント</th><th>採点基準</th></tr>`;
+    sc.cats.forEach((c) => {
+      h += `<tr class="cat-h"><td colspan="6">${c.name}　${c.na ? NA : c.score + "点"}</td></tr>`;
+      c.items.forEach((x) => {
+        if (x.na) { h += `<tr><td style="font-family:var(--f-body)">${x.name}</td><td><span class="chip warn">—</span></td><td>${esc(x.val === NA ? NA : x.val)}</td><td>${NA}</td><td>${esc(x.comment)}</td><td style="font-family:var(--f-body);color:var(--ink-3)">${x.crit}</td></tr>`; return; }
+        const [m, lv] = mark(x.pts);
+        const on = Math.round(x.pts);
+        const dots = `<span class="dots ${x.pts < 4 ? "low" : x.pts < 6 ? "mid" : ""}" aria-hidden="true">${Array.from({ length: 10 }, (_, i) => `<i class="${i < on ? "on" : ""}"></i>`).join("")}</span>`;
+        h += `<tr><td style="font-family:var(--f-body)">${x.name}</td><td><span class="chip ${lv}">${m}</span></td><td>${esc(x.val)}</td><td>${dots} ${x.pts.toFixed(1)}</td><td>${esc(x.comment)}</td><td style="font-family:var(--f-body);color:var(--ink-3)">${x.crit}</td></tr>`;
+      });
+    });
+    $("items").innerHTML = h;
+  }
+
+  // ---------- 描画 ----------
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-6))));
+    const n = raw / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+  }
+  function renderChart(R, key, label) {
+    const box = $("chart");
+    const W = 720, Hh = 240, m = { l: 52, r: 12, t: 14, b: 26 };
+    const vals = R.map((r) => r[key]);
+    let mx = Math.max(0, ...vals), mn = Math.min(0, ...vals);
+    const step = niceStep((mx - mn || 1) / 4);
+    mx = Math.ceil(mx / step) * step; mn = Math.floor(mn / step) * step;
+    if (mx === mn) mx = mn + step;
+    const ih = Hh - m.t - m.b, iw = W - m.l - m.r;
+    const y = (v) => m.t + ((mx - v) / (mx - mn)) * ih;
+    const bw = iw / R.length, barW = Math.max(4, Math.min(36, bw - 4));
+    let g = "";
+    for (let v = mn; v <= mx + 1e-9; v += step) {
+      g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="${Math.abs(v) < 1e-9 ? 1.5 : 1}" ${Math.abs(v) < 1e-9 ? "" : 'stroke-dasharray="2 3"'}/>`;
+      g += `<text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v, 0)}</text>`;
+    }
+    const every = R.length > 20 ? 5 : R.length > 10 ? 2 : 1;
+    R.forEach((r, i) => {
+      const v = r[key], cx = m.l + bw * i + bw / 2, y0 = y(0), y1 = y(v);
+      const top = Math.min(y0, y1), h = Math.max(1, Math.abs(y1 - y0));
+      const rad = Math.min(4, h / 2, barW / 2), x0 = cx - barW / 2, x1 = cx + barW / 2;
+      const d = v >= 0
+        ? `M${x0},${y0} V${top + rad} Q${x0},${top} ${x0 + rad},${top} H${x1 - rad} Q${x1},${top} ${x1},${top + rad} V${y0} Z`
+        : `M${x0},${y0} V${top + h - rad} Q${x0},${top + h} ${x0 + rad},${top + h} H${x1 - rad} Q${x1},${top + h} ${x1},${top + h - rad} V${y0} Z`;
+      g += `<path d="${d}" fill="${v >= 0 ? "var(--accent)" : "var(--neg)"}"/>`;
+      g += `<rect x="${m.l + bw * i}" y="${m.t}" width="${bw}" height="${ih}" fill="transparent" data-i="${i}"/>`;
+      if ((i + 1) % every === 0 || i === 0) g += `<text x="${cx}" y="${Hh - 8}" text-anchor="middle">${r.y}年</text>`;
+    });
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="年次の${label}">${g}</svg><div class="tip" hidden></div>`;
+    const tip = box.querySelector(".tip"), svg = box.querySelector("svg");
+    svg.addEventListener("pointermove", (e) => {
+      const t = e.target.closest("rect[data-i]");
+      if (!t) { tip.hidden = true; return; }
+      const r = R[+t.dataset.i], bb = box.getBoundingClientRect();
+      tip.innerHTML = `${r.y}年目　${label} ${fmt(r[key], 1)}`;
+      tip.style.left = Math.min(bb.width - 90, Math.max(90, e.clientX - bb.left)) + "px";
+      tip.style.top = e.clientY - bb.top + "px";
+      tip.hidden = false;
+    });
+    svg.addEventListener("pointerleave", () => (tip.hidden = true));
+  }
+  const pairs = (list) => list.map(([l, v]) => `<div><span>${l}</span><span>${v}</span></div>`).join("");
+  const c1 = (v, d = 1) => `<td class="${v < 0 ? "neg" : ""}">${fmt(v, d)}</td>`;
+  const lackHtml = (a, keys) => `<b>データ不足のため表示していません。</b> 次の項目を入力してください：` + keys.flatMap((k) => a.miss[k]).filter((v, i, arr) => arr.indexOf(v) === i).join("、");
+  function showLack(id, show, html) {
+    $("lack-" + id).hidden = !show;
+    if (show) $("lack-" + id).innerHTML = html;
+    const body = $("body-" + id);
+    if (body) body.hidden = show;
+  }
+
+  function renderNeed(st, p) {
+    const grid = $("needGrid");
+    const all = GROUPS.map((g) => {
+      const miss = st.m[g.key];
+      const done = miss.length === 0;
+      return `<div class="${done ? "done" : "todo"} ${g.must ? "must" : ""}"><h4><span>${g.name}</span><span class="st">${done ? "揃っています" : g.must ? "必須・未入力あり" : "未入力あり"}</span></h4>
+        <div style="color:var(--ink-3);font-size:.74rem">使う分析：${g.use}</div>${done ? "" : `<ul>${miss.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`}</div>`;
+    });
+    grid.innerHTML = all.join("");
+    const nMiss = GROUPS.reduce((s, g) => s + st.m[g.key].length, 0);
+    $("needSub").textContent = !st.ok.core ? "基本の収支が揃うまで分析を行いません" : nMiss ? `未入力 ${nMiss}項目。その項目を使う分析だけを止めています` : "すべて揃っています";
+    // 入力欄の印
+    const missIds = new Set();
+    GROUPS.forEach((g) => g.ids.forEach((k) => {
+      if (k === "age" && p.isNew === true) return;
+      if ((k === "rate" || k === "term") && p.loan === 0) return;
+      if (!fin(p[k])) missIds.add(k);
+    }));
+    NUM.forEach((k) => { const box = $(k).closest(".in"); if (box) box.classList.toggle("missing", missIds.has(k)); });
+    $("kindSeg").style.outline = p.isNew === null ? "1.5px dashed var(--warn)" : "";
+    $("declLabel").firstChild.nodeValue = p.isNew === true ? "家賃下落（11年目から）" : "家賃下落";
+    $("estBar").hidden = GROUPS.every((g) => st.m[g.key].length === 0);
+    $("finAskBar").hidden = fin(p.loan) && (p.loan === 0 || (fin(p.rate) && fin(p.term)));
+    const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
+    $("genList").innerHTML = gens.length ? `<b>一般値を入れている前提（${gens.length}項目）：</b>` + gens.map((k) => `${LABEL[k]} ${$(k).value !== "" ? esc($(k).tagName === "SELECT" ? $(k).selectedOptions[0].text : $(k).value) : "（" + (k === "cap" ? "基本の収支が揃うと自動計算" : "構造を選ぶと自動設定") + "）"}`).join("、") + "。入力欄の「一般値」の印は、値を書き換えると外れます。各値の根拠は入力欄にカーソルを合わせると表示されます。" : "";
+  }
+
+  let current = null;
+  function render() {
+    const p = read();
+    syncGeneral(p);
+    const st = missing(p);
+    renderNeed(st, p);
+    $("propLabel").textContent = [p.pname, p.addr].filter(Boolean).join("／");
+    const showRes = st.ok.core;
+    ["verdictCard", "scoreCard", "kpis", "costCard", "tabsCard"].forEach((id) => ($(id).hidden = !showRes));
+    renderCompare();
+    if (!showRes) { current = null; return; }
+
+    const a = analyze(p);
+    const ok = a.ok;
+    const rs = rentStats(p);
+    const sk = sekisan(a);
+    const bk = bankEval(a, rs, sk);
+    const j = judge(a, rs, sk, bk);
+    const sc = scoreAll(a, rs, sk, bk);
+    current = { p, a, rs, sk, bk, j, sc };
+    const q = a.p;
+
+    const b = $("badge");
+    b.className = "badge " + j.verdict[0];
+    b.textContent = j.verdict[1];
+    $("verdictText").textContent = `要対応 ${j.nBad}件・注意 ${j.nWarn}件`;
+    $("alerts").innerHTML = j.al.map((x) => `<li><span class="chip ${x.lv}">${chipLabel[x.lv]}</span><span>${x.t}</span></li>`).join("");
+    $("memoBar").hidden = !sampleFn;
+    renderScore(sc);
+    renderInitCosts(a);
+
+    const k = [
+      ["表面利回り", pct(a.surface), "満室年収÷物件価格"],
+      ["実質利回り（FCR）", pct(a.fcr), "NOI÷総投資額"],
+      ["自己資金利回り（CCR）", pct(a.ccr), "初年度税引前CF÷自己資金", a.ccr < 0],
+      ["IRR（税引後）", ok.exit ? pct(a.irr) : NA, ok.exit ? `${a.H}年保有・売却込み` : "税・出口の項目が未入力", a.irr < 0],
+      ["DSCR", a.loan > 0 ? a.dscr.toFixed(2) : "借入なし", "NOI÷年間返済額", a.dscr < 1],
+      ["損益分岐入居率", pct(a.ber, 1), "(経費+返済)÷満室年収", a.ber > 1],
+      ["積算評価／価格", sk.ok ? pct(sk.ratio, 0) : NA, sk.ok ? `積算 ${fmt(sk.total, 0)}万円` : "積算の項目が未入力", sk.ok && sk.ratio < 0.7],
+      ["自己資金倍率", fin(a.multiple) ? a.multiple.toFixed(2) + "倍" : NA, "(累計CF+売却手取り)÷自己資金", a.multiple < 1],
+    ];
+    $("kpis").innerHTML = k.map(([kk, v, d, neg]) => `<div class="kpi"><span class="k">${kk}</span><span class="v${neg ? " neg" : ""}">${v}</span><span class="d">${d}</span></div>`).join("");
+
+    // CF
+    const H = a.H;
+    const cfYears = a.loan > 0 && fin(p.term) && p.term > 0 ? Math.min(YEARS - 1, Math.ceil(p.term)) : fin(p.hold) ? H : 10;
+    const R = a.rows.slice(0, cfYears);
+    const Rb = a.rows.slice(0, fin(p.hold) ? H : 10);
+    const minR = R.reduce((x, y) => ((ok.tax ? y.atcf : y.btcf) < (ok.tax ? x.atcf : x.btcf) ? y : x));
+    $("cost").innerHTML = pairs([
+      ["物件価格", fmt(a.P, 0)], ["仲介手数料" + (q.isNew ? "（売主物件のため不要）" : ""), fmt(a.brokerage, 1)], ["その他諸費用", fmt(a.other, 1)],
+      ["総投資額", fmt(a.total, 0)], ["借入額", fmt(a.loan, 0)], ["自己資金", fmt(a.equity, 0)],
+      ["月額返済", fmt(a.pm, 1)], ["初年度 税引前CF", fmt(a.y1.btcf, 1)], ["初年度 税引後CF", ok.tax ? fmt(a.y1.atcf, 1) : NA],
+      [`${R.length}年間の累計CF（${ok.tax ? "税引後" : "税引前"}）`, fmt(ok.tax ? R[R.length - 1].cum : R[R.length - 1].cumB, 0)], ["CFが最も少ない年", `${minR.y}年目 ${fmt(ok.tax ? minR.atcf : minR.btcf, 0)}`], ["LTV", pct(a.ltv, 1)],
+    ]);
+    $("chartTitle").textContent = ok.tax ? `税引後CFの推移（${R.length}年）` : `税引前CFの推移（${R.length}年）— 税引後は${a.miss.tax.join("・")}が未入力のため表示していません`;
+    renderChart(R, ok.tax ? "atcf" : "btcf", ok.tax ? "税引後CF" : "税引前CF");
+    const rates = a.loan > 0 ? [q.rate - 0.5, q.rate, q.rate + 1, q.rate + 2].filter((r) => r >= 0) : [null];
+    const vacs = [5, 10, 20, 30];
+    if (!vacs.includes(q.vac)) { vacs.push(q.vac); vacs.sort((x, y) => x - y); }
+    let s = `<tr><th>金利 ＼ 空室率</th>${vacs.map((v) => `<th>${v}%</th>`).join("")}</tr>`;
+    rates.forEach((r) => {
+      s += `<tr><th>${r === null ? "借入なし" : r.toFixed(2) + "%"}</th>` + vacs.map((v) => {
+        const x = analyze(p, r === null ? { vac: v } : { rate: r, vac: v }).y1.btcf;
+        const base = (r === null || Math.abs(r - q.rate) < 1e-9) && v === q.vac;
+        return `<td class="${x < 0 ? "neg" : ""} ${base ? "base" : ""}">${fmt(x, 0)}</td>`;
+      }).join("") + "</tr>";
+    });
+    $("sens").innerHTML = s;
+    let t = `<tr><th>年</th><th>実効収入</th><th>運営費</th><th>NOI</th><th>修繕</th><th>返済額</th><th>税引前CF</th><th>税額</th><th>税引後CF</th><th>累計CF</th></tr>`;
+    R.forEach((r) => {
+      t += `<tr><td>${r.y}年目</td>${c1(r.egi)}${c1(r.opex)}${c1(r.noi)}${c1(r.repair)}${c1(r.ds)}${c1(r.btcf)}${ok.tax ? c1(r.tax) + c1(r.atcf) + c1(r.cum, 0) : `<td>—</td><td>—</td>${c1(r.cumB, 0)}`}</tr>`;
+    });
+    $("ytable").innerHTML = t;
+    $("cfNote").textContent = [
+      !ok.tax ? `税額・税引後CFは「${a.miss.tax.join("・")}」が未入力のため空欄です（累計CFは税引前）。` : "",
+      a.loan > 0 && fin(p.term) ? `融資期間${Math.ceil(p.term)}年（完済まで）を表示しています。` : !fin(p.hold) ? "保有期間が未入力のため、表は10年分を表示しています。" : `借入なしのため保有期間${H}年を表示しています。`,
+      q.isNew ? `新築のため家賃は10年間据え置き、11年目から年${q.decl}%下落で計算しています。` : "",
+      !(p.repAmt > 0) ? "大規模修繕は未入力のため計上していません。" : "",
+    ].join("");
+
+    // 出口
+    showLack("exit", !ok.exit, lackHtml(a, ["tax", "exit"]));
+    if (ok.exit) {
+      const caps = [q.cap - 0.5, q.cap, q.cap + 0.5, q.cap + 1].filter((c) => c > 0);
+      const best = bestExit(a);
+      let e = `<tr><th>売却年</th><th>残債</th><th>買主の融資<br>（残存年数）</th><th>税区分</th>${caps.map((c) => `<th>表面${c.toFixed(1)}%<br>手取り／IRR</th>`).join("")}</tr>`;
+      exitYears().forEach((h) => {
+        const base = a.sale(h, q.cap);
+        e += `<tr class="${best && best.h === h ? "best" : ""} ${h === H ? "hl" : ""}"><td>${h}年目</td>${c1(base.bal, 0)}<td>${base.remain}年</td><td style="font-family:var(--f-body)">${base.longTerm ? "長期" : "短期"}</td>` +
+          caps.map((c) => { const x = a.sale(h, c); return `<td class="${x.net < 0 ? "neg" : ""}">${fmt(x.net, 0)}／${pct(x.irr, 1)}</td>`; }).join("") + "</tr>";
+      });
+      $("exitTable").innerHTML = e;
+      const s0 = a.s;
+      $("exitSum").innerHTML = pairs([
+        ["想定売却年", `${H}年目`], ["想定売却価格", fmt(s0.price, 0)], ["売却費用", fmt(s0.cost, 0)],
+        ["残債", fmt(s0.bal, 0)], ["簿価（取得費−償却累計）", fmt(s0.book, 0)], ["譲渡益", fmt(s0.gain, 0)],
+        [`譲渡税（${s0.longTerm ? "長期20.315%" : "短期39.63%"}）`, fmt(s0.tax, 0)], ["売却手取り", `<b>${fmt(s0.net, 0)}</b>`], ["IRR", pct(s0.irr)],
+        ["IRR最大の売却年", best ? `${best.h}年目（${pct(best.irr)}）` : "—"], ["自己資金を回収できる売却価格の下限", fmt(s0.bal + s0.cost + s0.tax + a.equity - s0.cum, 0)], ["売却時のNOI利回り", pct(a.rows[H].noi / s0.price)],
+      ]);
+      const hold20 = a.sale(20, q.cap);
+      $("exitHold").innerHTML = pairs([
+        [`${H}年で売却：総回収額`, fmt(s0.total, 0)], ["20年保有して売却：総回収額", fmt(hold20.total, 0)],
+        ["20年保有のIRR", pct(hold20.irr)], ["完済年", a.loan > 0 ? `${Math.round(q.term)}年目` : "借入なし"],
+      ]);
+    }
+
+    // 帳簿
+    showLack("book", !ok.tax, lackHtml(a, ["tax"]));
+    if (ok.tax) {
+      const hasCap = fin(p.cap);
+      let bkh = `<tr><th>年</th><th>収入</th><th>経費</th><th>支払利息</th><th>減価償却</th><th>不動産所得</th><th>税額</th><th>元金返済</th><th>税引後CF</th><th>簿価 建物</th><th>簿価 土地</th><th>残債</th><th>想定時価</th><th>純資産（時価）</th></tr>`;
+      Rb.forEach((r) => {
+        const mv = hasCap ? a.sale(r.y, q.cap).price : NaN;
+        const flag = r.taxable > 0 && r.atcf < 0;
+        bkh += `<tr class="${flag ? "hl" : ""}"><td>${r.y}年目</td>${c1(r.egi)}${c1(r.opex + r.repair)}${c1(r.interest)}${c1(r.dep)}${c1(r.taxable)}${c1(r.tax)}${c1(r.principal)}${c1(r.atcf)}${c1(r.bookB, 0)}${c1(r.bookL, 0)}${c1(r.bal, 0)}${c1(mv, 0)}${c1(mv - r.bal, 0)}</tr>`;
+      });
+      $("bookTable").innerHTML = bkh;
+      const lossYears = Rb.filter((r) => r.taxable < 0);
+      const lossSum = lossYears.reduce((s2, r) => s2 + r.taxable, 0);
+      $("bookSum").innerHTML = pairs([
+        ["取得価額（諸費用込）", fmt(a.total, 0)], ["土地", fmt(a.landBasis, 0)], ["建物（躯体）", fmt(a.bldgBasis - a.equipBasis, 0)],
+        ["建物（設備）", fin(p.equip) ? fmt(a.equipBasis, 0) : "区分なし"], ["躯体の償却", `${a.lifeS}年／年${fmt(a.depS, 1)}`], ["設備の償却", fin(p.equip) ? `${a.lifeE}年／年${fmt(a.depE, 1)}` : "—"],
+        ["初年度 不動産所得", fmt(a.y1.taxable, 1)], ["赤字の年数と合計", lossYears.length ? `${lossYears.length}年／${fmt(lossSum, 0)}` : "なし"], ["損益通算の節税額（概算）", fmt((-lossSum * q.taxr) / 100, 0)],
+        ["デッドクロス", a.deadCross ? `${a.deadCross}年目` : "なし"], [`${Rb.length}年目末の残債`, fmt(Rb[Rb.length - 1].bal, 0)], [`${Rb.length}年目末の純資産（時価）`, hasCap ? fmt(a.sale(Rb.length, q.cap).price - Rb[Rb.length - 1].bal, 0) : NA],
+      ]);
+    }
+
+    // 賃料
+    renderRoll(rs, q, a);
+
+    // 積算
+    showLack("seki", !sk.ok, lackHtml(a, ["seki"]));
+    if (sk.ok) {
+      const mx = Math.max(q.price, sk.total, fin(sk.income) ? sk.income : 0, a.loan, 1);
+      const bar = (lbl, v, col) => `<div class="bar-row"><span>${lbl}</span><div class="bar-track"><div class="bar-fill" style="width:${fin(v) ? Math.max(0, Math.min(100, (v / mx) * 100)) : 0}%;background:${col}"></div></div><span class="val">${fin(v) ? fmt(v, 0) + "万円" : NA}</span></div>`;
+      $("sekiBars").innerHTML = bar("物件価格", q.price, "var(--ink-2)") + bar("積算価格", sk.total, "var(--accent)") + bar("収益価格", sk.income, "var(--accent)") + (a.loan > 0 ? bar("借入額", a.loan, "var(--warn)") : "");
+      $("sekiSum").innerHTML = pairs([
+        ["土地評価", `${fmt(sk.land, 0)}万円`], ["建物評価", `${fmt(sk.bldg, 0)}万円`], ["積算価格", `<b>${fmt(sk.total, 0)}万円</b>`],
+        ["価格に対する積算比率", pct(sk.ratio, 0)], ["借入額に対する積算", a.loan > 0 ? pct(sk.loanCover, 0) : "借入なし"], ["積算と借入の差（担保余力）", fmt(sk.total - a.loan, 0) + "万円"],
+        ["建物の残存割合", `${a.remainLegal}／${a.legal}年（${pct(sk.bRatio, 0)}）`], ["公示価格水準の土地（路線価÷0.8）", `${fmt(sk.land / 0.8, 0)}万円`], ["収益価格（満室年収÷売却時の表面利回り）", fin(sk.income) ? `${fmt(sk.income, 0)}万円` : "売却時の表面利回りが未入力"],
+        ["土地評価の割合", pct(sk.land / sk.total, 0)],
+      ]);
+    }
+
+    // 銀行
+    showLack("bank", !bk.ok, lackHtml(a, ["bank"]));
+    if (bk.ok) renderBank(q, a, bk);
+  }
+
+  function renderRoll(rs, p, a) {
+    const lackR = [];
+    if (!rs) lackR.push("レントロール（部屋別の面積と賃料）");
+    if (!fin(p.mkt) || !(a.src.mkt > 0)) lackR.push("相場賃料単価");
+    $("lack-rent").hidden = lackR.length === 0;
+    $("lack-rent").innerHTML = `<b>データ不足：</b>${lackR.join("、")}。${!rs ? "資料を読み込むか「部屋を追加」で入力してください。" : "相場との比較は相場賃料単価の入力後に表示します。"}`;
+    let h = `<tr><th>部屋</th><th>面積㎡</th><th>賃料 円/月</th><th>状況</th><th>㎡単価</th><th>相場との差</th><th></th></tr>`;
+    roll.forEach((r, i) => {
+      const it = rs ? rs.items[i] : null;
+      const dev = it ? it.dev : NaN;
+      const cls = dev > 0.1 ? "neg" : dev < -0.1 ? "pos" : "";
+      const tag = dev > 0.1 ? "高い" : dev < -0.1 ? "低い" : "";
+      h += `<tr><td><input data-i="${i}" data-k="room" value="${esc(r.room)}" aria-label="部屋番号"></td>
+        <td><input data-i="${i}" data-k="area" type="number" step="0.1" value="${fin(r.area) ? r.area : ""}" aria-label="面積"></td>
+        <td><input data-i="${i}" data-k="rent" type="number" step="100" value="${fin(r.rent) ? r.rent : ""}" aria-label="賃料"></td>
+        <td><select data-i="${i}" data-k="occ" aria-label="入居状況"><option value="occ"${r.occ !== "vacant" ? " selected" : ""}>入居</option><option value="vacant"${r.occ === "vacant" ? " selected" : ""}>空室</option></select></td>
+        <td>${it && fin(it.unit) ? fmt(it.unit, 0) : "—"}</td><td class="${cls}">${fin(dev) ? (dev > 0 ? "+" : "") + pct(dev, 1) + " " + tag : "—"}</td>
+        <td><button class="btn ghost sm" type="button" data-del-room="${i}">削除</button></td></tr>`;
+    });
+    $("rollTable").innerHTML = h;
+    const hasM = rs && fin(rs.mkt);
+    $("rentSum").innerHTML = rs ? pairs([
+      ["戸数／入居", `${rs.n}戸／${rs.occN}戸（${pct(rs.occRate, 0)}）`], ["平均賃料単価", `${fmt(rs.unitAvg, 0)}円/㎡（${fmt(rs.unitAvg * 3.30578, 0)}円/坪）`], ["相場賃料単価", hasM ? `${fmt(rs.mkt, 0)}円/㎡` : NA],
+      ["レントロールの満室年収", `${fmt(rs.rollGpi, 0)}万円`], ["現況の年収（入居分）", `${fmt(rs.occGpi, 0)}万円`], ["相場賃料での満室年収", hasM ? `${fmt(rs.mktGpi, 0)}万円` : NA],
+      ["相場より高い部屋", hasM ? `${rs.over.length}室（退去時 年${fmt(rs.overLoss, 0)}万円減）` : NA], ["相場より低い部屋", hasM ? `${rs.under.length}室` : NA], ["相場ベースの表面利回り", hasM && a.ok.core ? pct(rs.mktGpi / p.price) : NA],
+    ]) : "";
+  }
+
+  function renderBank(p, a, bk) {
+    const surplus = bk.best - a.loan;
+    $("loanBox").innerHTML = [
+      ["融資見込み額（評価の高い方式）", fmt(bk.best, 0) + "万円", `積算重視型 ${fin(bk.sekiType) ? fmt(bk.sekiType, 0) : NA}／収益重視型 ${fmt(bk.incType, 0)}`],
+      ["借入額との差", (surplus >= 0 ? "+" : "") + fmt(surplus, 0) + "万円", surplus >= 0 ? "見込みの範囲内" : "この分の自己資金追加が必要", surplus < 0 ? "neg" : "pos"],
+      ["必要な自己資金（見込み額で借りた場合）", fmt(bk.needEquity, 0) + "万円", `総投資額 ${fmt(a.total, 0)}万円 − 融資見込み`],
+    ].map(([k, v, d, c]) => `<div><span class="k">${k}</span><span class="v ${c || ""}">${v}</span><span class="d">${d}</span></div>`).join("");
+    const mx = Math.max(p.price, bk.hasLand ? bk.seki : 0, bk.direct, bk.dcf, a.loan, 1);
+    const bar = (lbl, v, col) => `<div class="bar-row"><span>${lbl}</span><div class="bar-track"><div class="bar-fill" style="width:${fin(v) ? Math.max(0, Math.min(100, (v / mx) * 100)) : 0}%;background:${col}"></div></div><span class="val">${fin(v) ? fmt(v, 0) + "万円" : NA}</span></div>`;
+    $("bankBars").innerHTML = bar("物件価格", p.price, "var(--ink-2)") + bar("積算評価", bk.hasLand ? bk.seki : NaN, "var(--accent)") + bar("担保評価", bk.hasLand ? bk.tanpo : NaN, "var(--accent)")
+      + bar("直接還元", bk.direct, "var(--ok)") + bar("DCF", bk.dcf, "var(--ok)") + bar("返済能力上限", bk.capLoan, "var(--warn)") + (a.loan > 0 ? bar("借入額", a.loan, "var(--neg)") : "");
+    $("bankSeki").innerHTML = bk.hasLand ? `<tr><th>区分</th><th>数量</th><th>単価</th><th>補正</th><th>評価額</th><th>掛目</th><th>担保評価</th></tr>
+      <tr><td>土地</td><td>${fmt(p.landArea, 1)}㎡</td><td>${fmt(p.rosen * 1000 * p.bLandBasis, 0)}円/㎡</td><td>×${p.landAdj}${p.bLandBasis > 1 ? "（公示水準）" : "（路線価）"}</td><td>${fmt(bk.land, 0)}</td><td>${p.bkLand}%</td><td>${fmt(bk.tLand, 0)}</td></tr>
+      <tr><td>建物</td><td>${fmt(p.floorArea, 1)}㎡</td><td>${fmt(p.repro, 1)}万円/㎡</td><td>残存${a.remainLegal}/${a.legal}年</td><td>${fmt(bk.bldg, 0)}</td><td>${p.bkBldg}%</td><td>${fmt(bk.tBldg, 0)}</td></tr>
+      <tr class="sum"><td>合計</td><td></td><td></td><td></td><td>${fmt(bk.seki, 0)}</td><td></td><td>${fmt(bk.tanpo, 0)}</td></tr>
+      <tr><td>価格に対する割合</td><td></td><td></td><td></td><td>${pct(bk.seki / p.price, 0)}</td><td></td><td>${pct(bk.tanpo / p.price, 0)}</td></tr>`
+      : `<tr><td style="font-family:var(--f-body)">${NA}：${a.miss.seki.join("、")} を入力すると積算評価を表示します（融資見込みは収益重視型のみで算出）。</td></tr>`;
+    $("bankDirect").innerHTML = `<tr><th>項目</th><th>金額（万円/年）</th><th>根拠</th></tr>
+      <tr><td>満室賃料（採用値）</td>${c1(bk.gpi, 0)}<td style="font-family:var(--f-body)">${bk.useMkt ? "相場賃料ベース（入力値より低いため採用）" : "入力した満室想定年収"}</td></tr>
+      <tr><td>空室損</td>${c1(-bk.vacLoss, 0)}<td style="font-family:var(--f-body)">査定空室率 ${p.bVac}%</td></tr>
+      <tr><td>経費</td>${c1(-bk.exp, 0)}<td style="font-family:var(--f-body)">査定経費率 ${p.bExp}%</td></tr>
+      <tr class="sum"><td>査定NOI</td>${c1(bk.noi, 0)}<td style="font-family:var(--f-body)">あなたの試算NOI ${fmt(a.y1.noi, 0)}万円</td></tr>
+      <tr><td>還元利回り</td><td>${p.bCap}%</td><td></td></tr>
+      <tr class="sum"><td>収益還元評価</td>${c1(bk.direct, 0)}<td style="font-family:var(--f-body)">査定NOI÷還元利回り（価格の${pct(bk.direct / p.price, 0)}）</td></tr>
+      <tr><td>掛目後</td>${c1(bk.directT, 0)}<td style="font-family:var(--f-body)">×${p.bkInc}%</td></tr>`;
+    $("bankDcfSum").innerHTML = pairs([
+      ["10年間のNOI現在価値", fmt(bk.pvSum, 0) + "万円"], ["復帰価格（11年目NOI÷" + (bk.tcap * 100).toFixed(1) + "%−売却費用）", fmt(bk.rev, 0) + "万円"],
+      ["復帰価格の現在価値", fmt(bk.revPv, 0) + "万円"], ["DCF価格", `<b>${fmt(bk.dcf, 0)}万円</b>`], ["価格に対する割合", pct(bk.dcf / p.price, 0)], ["割引率／最終還元利回り", `${p.bDisc}%／${(bk.tcap * 100).toFixed(1)}%（還元利回り+0.5%）`],
+    ]);
+    $("bankDcf").innerHTML = `<tr><th>年</th>${bk.dcfRows.map((r) => `<th>${r.t}</th>`).join("")}</tr>
+      <tr><td>査定NOI</td>${bk.dcfRows.map((r) => c1(r.noi, 0)).join("")}</tr>
+      <tr><td>複利現価率</td>${bk.dcfRows.map((r) => `<td>${r.df.toFixed(3)}</td>`).join("")}</tr>
+      <tr><td>現在価値</td>${bk.dcfRows.map((r) => c1(r.pv, 0)).join("")}</tr>`;
+    const sekiMin = bk.hasLand ? Math.min(bk.tanpo, bk.capLoan) : NaN;
+    const incMin = Math.min(bk.directT, bk.capLoan);
+    let lt = `<tr><th>上限の根拠</th><th>上限額（万円）</th><th>条件</th><th>積算重視型</th><th>収益重視型</th></tr>`;
+    bk.limits.forEach((l) => {
+      const inS = l.type === "seki" || l.type === "both", inI = l.type === "inc" || l.type === "both";
+      const isMin = (inS && Math.abs(l.v - sekiMin) < 1e-6) || (inI && Math.abs(l.v - incMin) < 1e-6);
+      lt += `<tr class="${isMin && !l.na ? "min" : ""}"><td>${l.k}</td>${l.na ? `<td>${NA}</td>` : c1(l.v, 0)}<td style="font-family:var(--f-body)">${l.na ? "積算の項目が未入力" : l.note}</td><td>${inS ? "対象" : ""}</td><td>${inI ? "対象" : ""}</td></tr>`;
+    });
+    lt += `<tr class="sum"><td>融資見込み</td><td></td><td></td><td>${fin(bk.sekiType) ? fmt(bk.sekiType, 0) : NA}</td><td>${fmt(bk.incType, 0)}</td></tr>`;
+    $("bankLimits").innerHTML = lt;
+  }
+
+  // ---------- 比較（この端末に保存） ----------
+  const KEY = "re-analyzer-saved-v3";
+  function loadSaved() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
+  function storeSaved(list) { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {} }
+  function revive(p) {
+    const o = Object.assign({ roll: [] }, p);
+    NUM.forEach((k) => { if (o[k] === null || o[k] === undefined || o[k] === "") o[k] = NaN; });
+    return o;
+  }
+  function renderCompare() {
+    const list = loadSaved();
+    $("cmpEmpty").hidden = list.length > 0;
+    if (!list.length) { $("cmp").innerHTML = ""; return; }
+    let h = `<tr><th>物件</th><th>価格</th><th>表面</th><th>FCR</th><th>CCR</th><th>DSCR</th><th>IRR</th><th>積算比率</th><th>初年度税引前CF</th><th>スコア</th><th>判定</th><th></th></tr>`;
+    list.forEach((it, i) => {
+      const p = revive(it.p);
+      const st = missing(p);
+      const btns = `<td><button class="btn ghost sm" data-load="${i}" type="button">読込</button> <button class="btn ghost sm" data-del="${i}" type="button">削除</button></td>`;
+      if (!st.ok.core) { h += `<tr><td style="font-family:var(--f-body)">${esc(it.name)}</td><td colspan="10" style="font-family:var(--f-body);text-align:left">${NA}（${st.m.core.join("、")}）</td>${btns}</tr>`; return; }
+      const a = analyze(p), rs = rentStats(p), sk = sekisan(a), bk = bankEval(a, rs, sk), j = judge(a, rs, sk, bk), sc = scoreAll(a, rs, sk, bk);
+      h += `<tr><td style="font-family:var(--f-body)">${esc(it.name)}</td><td>${fmt(a.P, 0)}</td><td>${pct(a.surface)}</td><td>${pct(a.fcr)}</td><td>${pct(a.ccr)}</td><td>${a.loan > 0 ? a.dscr.toFixed(2) : "—"}</td><td>${a.ok.exit ? pct(a.irr) : NA}</td><td>${sk.ok ? pct(sk.ratio, 0) : NA}</td>${c1(a.y1.btcf)}<td>${fin(sc.total) ? `${sc.total}点 ${sc.grade}` : "—"}（${sc.nScored}/${sc.nItems}項目）</td><td><span class="chip ${j.verdict[0]}">${j.verdict[1]}</span></td>${btns}</tr>`;
+    });
+    $("cmp").innerHTML = h;
+  }
+  function apply(p) {
+    NUM.concat(TXT).forEach((k) => { const v = p[k]; $(k).value = v === null || v === undefined || (typeof v === "number" && !fin(v)) ? "" : v; });
+    roll = Array.isArray(p.roll) ? p.roll.map((r) => Object.assign({}, r)) : [];
+    setKind(p.isNew === true ? true : p.isNew === false ? false : null);
+    finType = p.finType || null; finSrc = p.finSrc || null;
+    document.querySelectorAll(".in.filled").forEach((x) => x.classList.remove("filled"));
+    Object.keys(GENERAL).forEach((k) => { genMode[k] = false; });
+    Object.keys(estMode).forEach((k) => delete estMode[k]);
+    markGeneral(); markEst();
+  }
+  function applyGeneral() { Object.keys(GENERAL).forEach(setGeneral); }
+  function setKind(n) {
+    isNew = n;
+    $("kNew").setAttribute("aria-pressed", String(n === true));
+    $("kUsed").setAttribute("aria-pressed", String(n === false));
+    $("age").disabled = n === true;
+    if (n === true) $("age").value = "";
+  }
+
+  // ---------- イベント ----------
+  function onEdit() { render(); }
+  NUM.concat(TXT).forEach((k) => { $(k).addEventListener("input", () => { if (genMode[k]) { genMode[k] = false; markGeneral(); } if (estMode[k]) { delete estMode[k]; markEst(); } onEdit(); }); });
+  $("kNew").addEventListener("click", () => { delete estMode.isNew; });
+  $("kUsed").addEventListener("click", () => { delete estMode.isNew; });
+  $("estBtn").addEventListener("click", () => estimateMissing());
+  $("estBtn2").addEventListener("click", () => estimateMissing());
+  $("genBtn").addEventListener("click", () => { applyGeneral(); render(); });
+  $("kNew").addEventListener("click", () => { setKind(true); onEdit(); });
+  $("kUsed").addEventListener("click", () => { setKind(false); onEdit(); });
+  $("sampleBtn").addEventListener("click", () => { apply(SAMPLE); srcMap = {}; extNotes = []; $("found").innerHTML = ""; $("srcBox").hidden = true; $("exampleTag").hidden = false; render(); });
+  $("clearBtn").addEventListener("click", () => {
+    apply({}); applyGeneral(); srcMap = {}; extNotes = []; files = []; renderFiles(); $("paste").value = "";
+    $("found").innerHTML = ""; $("srcBox").hidden = true; $("exampleTag").hidden = true; $("memo").textContent = "";
+    status("ファイルを選ぶか、テキストを貼り付けてください。"); render();
+  });
+  $("saveBtn").addEventListener("click", () => {
+    const name = $("sname").value.trim() || $("pname").value.trim() || `物件${loadSaved().length + 1}`;
+    const list = loadSaved(); list.push({ name, p: read() }); storeSaved(list);
+    $("sname").value = ""; $("saveBtn").textContent = "保存しました";
+    setTimeout(() => ($("saveBtn").textContent = "保存"), 1500);
+    renderCompare();
+  });
+  $("cmp").addEventListener("click", (e) => {
+    const l = e.target.closest("[data-load]"), d = e.target.closest("[data-del]");
+    const list = loadSaved();
+    if (l) { apply(revive(list[+l.dataset.load].p)); extNotes = []; $("exampleTag").hidden = true; render(); selectTab("cf"); }
+    if (d) { list.splice(+d.dataset.del, 1); storeSaved(list); renderCompare(); }
+  });
+  $("rollTable").addEventListener("change", (e) => {
+    const t = e.target.closest("[data-k]");
+    if (!t) return;
+    const r = roll[+t.dataset.i];
+    r[t.dataset.k] = t.dataset.k === "room" || t.dataset.k === "occ" ? t.value : t.value === "" ? NaN : parseFloat(t.value);
+    const keep = [t.dataset.i, t.dataset.k];
+    render();
+    const el = $("rollTable").querySelector(`[data-i="${keep[0]}"][data-k="${keep[1]}"]`);
+    if (el) el.focus();
+  });
+  $("rollTable").addEventListener("click", (e) => {
+    const d = e.target.closest("[data-del-room]");
+    if (d) { roll.splice(+d.dataset.delRoom, 1); render(); }
+  });
+  $("addRoom").addEventListener("click", () => { roll.push({ room: "", area: NaN, rent: NaN, occ: "occ" }); render(); });
+  $("useRollGpi").addEventListener("click", () => {
+    const rs = rentStats(read());
+    if (rs) { $("gpi").value = Math.round(rs.rollGpi * 10) / 10; srcMap.gpi = "レントロールの賃料合計×12から算出"; render(); }
+    else $("mktStatus").textContent = "レントロールが未入力です。";
+  });
+
+  function selectTab(name) {
+    document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+    document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
+    try { localStorage.setItem("re-analyzer-tab", name); } catch (e) {}
+  }
+  $("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) selectTab(b.dataset.tab); });
+  const TABS = ["cf", "exit", "book", "rent", "seki", "bank", "cmp"];
+  const hashTab = (location.hash || "").slice(1);
+  let savedTab = null; try { savedTab = localStorage.getItem("re-analyzer-tab"); } catch (e) {}
+  if (TABS.includes(hashTab)) selectTab(hashTab); else if (TABS.includes(savedTab)) selectTab(savedTab);
+
+  // ---------- 資料の読み込み ----------
+  let files = [];
+  let extNotes = [];
+  let sampleFn = null, imgLimits = null, ctl = null;
+  const drop = $("drop"), fileIn = $("file");
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); setFiles(e.dataTransfer.files); });
+  fileIn.addEventListener("change", () => setFiles(fileIn.files));
+  function setFiles(list) {
+    const add = Array.from(list || []);
+    add.forEach((f) => { if (!files.some((x) => x.name === f.name && x.size === f.size)) files.push(f); });
+    fileIn.value = "";
+    renderFiles();
+    if (add.length) extract().catch((e) => status(errText(e), true));
+  }
+  function renderFiles() {
+    const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB");
+    $("flist").innerHTML = files.map((f, i) => `<li><span>${esc(f.name)}</span><small>${kb(f.size)}</small><button class="btn ghost sm" type="button" data-rm="${i}">外す</button></li>`).join("");
+  }
+  $("flist").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rm]");
+    if (b) { files.splice(+b.dataset.rm, 1); renderFiles(); status(files.length ? `${files.length}件のファイルがあります。「読み取って分析」で再読み取りできます。` : "ファイルを選ぶか、テキストを貼り付けてください。"); }
+  });
+  function status(t, err) { const s = $("readStatus"); s.textContent = t; s.classList.toggle("err", !!err); }
+
+  async function pdfToContent(file) {
+    if (!window.pdfjsLib) throw new Error("PDF読み込み機能を読み込めませんでした");
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    let text = "";
+    const n = Math.min(doc.numPages, 12);
+    for (let i = 1; i <= n; i++) {
+      const pg = await doc.getPage(i);
+      const tc = await pg.getTextContent();
+      text += tc.items.map((x) => x.str + (x.hasEOL ? "\n" : " ")).join("") + "\n";
+    }
+    const images = [];
+    if (text.replace(/\s/g, "").length < 80 * n) {
+      const max = Math.min(doc.numPages, 4);
+      for (let i = 1; i <= max; i++) {
+        const pg = await doc.getPage(i);
+        const vp = pg.getViewport({ scale: 2 });
+        const cv = document.createElement("canvas");
+        cv.width = vp.width; cv.height = vp.height;
+        await pg.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+        images.push(await new Promise((res) => cv.toBlob(res, "image/png")));
+      }
+    }
+    return { text, images };
+  }
+
+  async function gather() {
+    let text = $("paste").value.trim();
+    const images = [];
+    for (const f of files) {
+      const name = f.name.toLowerCase();
+      if (f.type === "application/pdf" || name.endsWith(".pdf")) {
+        status(`${f.name} を読み込んでいます…`);
+        const r = await pdfToContent(f);
+        text += `\n\n【${f.name}】\n` + r.text;
+        images.push(...r.images);
+      } else if (f.type.startsWith("image/")) {
+        images.push(f);
+      } else if (/\.xlsx?$/.test(name)) {
+        if (!window.XLSX) throw new Error("Excel読み込み機能を読み込めませんでした");
+        const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type: "array" });
+        text += `\n\n【${f.name}】\n` + wb.SheetNames.slice(0, 5).map((n) => `＜${n}＞\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join("\n");
+      } else {
+        text += `\n\n【${f.name}】\n` + (await f.text());
+      }
+    }
+    return { text: text.slice(0, 60000), images };
+  }
+
+  const PROMPT = `あなたは日本の収益不動産の資料（マイソク・物件概要書・レントロール）から数値を書き写す係です。
+厳守：資料に明記されている値だけを返す。計算・推測・一般的な相場・常識で補うことは禁止。記載が無い、読めない、曖昧な項目は null。
+許される変換は単位換算だけ（億円→万円、円→万円、坪→㎡は×3.30578、月額→年額は×12）。
+各項目は {"value": 値, "src": "資料中の該当箇所をそのまま引用（30字以内）"} で返し、src が書けない値は返さないこと。
+JSONオブジェクト1つだけで答える：
+{
+ "name": 物件名, "address": 所在地,
+ "is_new": 新築・未入居と明記なら true／中古（築年数や築年月の記載がある既存建物）なら false,
+ "price_man": 価格(万円),
+ "annual_rent_full_man": 満室想定年収(万円),
+ "surface_yield_pct": 表面利回り(%),
+ "structure": "RC"|"SRC"|"S_heavy"(重量鉄骨・肉厚4mm超と明記)|"S_light_34"(軽量鉄骨3〜4mm)|"S_light_3"(軽量鉄骨3mm以下)|"W"(木造)。鉄骨造で肉厚・重量/軽量の記載が無ければ null,
+ "built_year": 竣工・築年の西暦年,
+ "land_area_m2": 土地面積, "floor_area_m2": 延床面積,
+ "rosenka_sen_per_m2": 路線価(千円/㎡),
+ "property_tax_man": 固定資産税・都市計画税の年額(万円),
+ "building_price_man": 価格内訳の建物価格(万円、税込記載なら税込のまま),
+ "units": 総戸数,
+ "rent_roll": [{"room": 部屋番号, "area_m2": 面積, "rent_yen": 月額賃料(共益費込), "vacant": 空室なら true, "src": "該当行の引用"}],
+ "notes": [投資判断で注意すべき記載をそのまま短く。例：再建築不可、借地権、既存不適格、容積率超過、告知事項、サブリース]
+}`;
+
+  const norm = (s) => String(s ?? "").replace(/[０-９Ａ-Ｚａ-ｚ．，]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[\s,、，・:：]/g, "").toLowerCase();
+
+  async function extract() {
+    const { text, images } = await gather();
+    if (!text.trim() && !images.length) { status("ファイルを選ぶか、テキストを貼り付けてください。", true); return; }
+    if (sampleFn) {
+      if (images.length && !imgLimits && !text.trim()) { status("この表示環境では画像を読み取れません。テキストで貼り付けてください。", true); return; }
+      const useImgs = imgLimits ? images.slice(0, imgLimits.maxCount) : [];
+      status("AIが資料を読み取っています（30秒〜1分ほどかかります）…");
+      ctl = new AbortController();
+      $("stopBtn").hidden = false; $("readBtn").disabled = true;
+      try {
+        const opts = { signal: ctl.signal };
+        if (useImgs.length) opts.images = useImgs;
+        const data = await sampleFn.json(PROMPT + "\n\n--- 資料テキスト ---\n" + (text || "（画像のみ。画像に写っている記載だけを使うこと）"), opts);
+        applyExtract(data, "AI", text, useImgs.length > 0);
+      } catch (e) {
+        if (e && e.code === "cancelled") status("中止しました。");
+        else if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) { sampleFn = null; if (text.trim()) applyExtract(regexParse(text), "簡易", text, false); else status("AIが使えないため画像は読み取れません。テキストで貼り付けてください。", true); }
+        else status(errText(e), true);
+      } finally {
+        $("stopBtn").hidden = true; $("readBtn").disabled = false;
+      }
+    } else {
+      if (!text.trim()) { status("画像の読み取りにはClaude上でこのページを開く必要があります。テキストで貼り付けてください。", true); return; }
+      applyExtract(regexParse(text), "簡易", text, false);
+    }
+  }
+  function errText(e) {
+    const c = e && e.code;
+    if (c === "rate_limited") return "利用上限に達しました。しばらくしてから再度お試しください。";
+    if (c === "invalid_json") return "読み取り結果を解釈できませんでした。もう一度お試しください。";
+    if (c === "image_rejected") return "画像を読み込めませんでした。別のファイルでお試しください。";
+    if (c === "prompt_too_large") return "資料が大きすぎます。必要なページだけにしてください。";
+    return "読み取りに失敗しました。もう一度お試しください。" + (e && e.message && !c ? `（${e.message}）` : "");
+  }
+  $("readBtn").addEventListener("click", () => { extract().catch((e) => status(errText(e), true)); });
+  $("stopBtn").addEventListener("click", () => ctl && ctl.abort());
+
+  // 正規表現による簡易読み取り（AIが使えない場合）。記載どおりに一致したものだけを拾う
+  function regexParse(t) {
+    const s = t.replace(/[，,]/g, "").replace(/[０-９．]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    const f = {};
+    const put = (k, v, m) => { if (m) f[k] = { value: v, src: m[0].trim().slice(0, 40) }; };
+    let m = s.match(/価格[^\d\n]{0,10}(?:(\d+(?:\.\d+)?)億)?\s*(\d+(?:\.\d+)?)?\s*万円/);
+    if (m && (m[1] || m[2])) put("price_man", (m[1] ? +m[1] * 10000 : 0) + (m[2] ? +m[2] : 0), m);
+    m = s.match(/(?:満室|想定)[^\d\n]{0,12}(?:収入|賃料|年収)[^\d\n]{0,8}(\d+(?:\.\d+)?)\s*(万円|円)/);
+    if (m) put("annual_rent_full_man", m[2] === "円" ? +m[1] / 1e4 : +m[1], m);
+    m = s.match(/表面利回り[^\d\n]{0,8}(\d+(?:\.\d+)?)\s*%/); if (m) put("surface_yield_pct", +m[1], m);
+    if ((m = s.match(/SRC造|鉄骨鉄筋コンクリート/))) put("structure", "SRC", m);
+    else if ((m = s.match(/RC造|鉄筋コンクリート/))) put("structure", "RC", m);
+    else if ((m = s.match(/重量鉄骨/))) put("structure", "S_heavy", m);
+    else if ((m = s.match(/木造/))) put("structure", "W", m);
+    m = s.match(/((?:19|20)\d{2})\s*年\s*(?:\d{1,2}\s*月)?\s*(?:築|竣工|新築|建築)/) || s.match(/(?:築年月?|竣工|建築年月?)[^\d\n]{0,6}((?:19|20)\d{2})/);
+    if (m) put("built_year", +m[1], m);
+    m = s.match(/土地(?:面積)?[^\d\n]{0,10}(\d+(?:\.\d+)?)\s*(?:㎡|m2|平米)/); if (m) put("land_area_m2", +m[1], m);
+    m = s.match(/延(?:床|べ)?(?:面積)?[^\d\n]{0,10}(\d+(?:\.\d+)?)\s*(?:㎡|m2|平米)/); if (m) put("floor_area_m2", +m[1], m);
+    m = s.match(/路線価[^\d\n]{0,8}(\d+(?:\.\d+)?)\s*千円/); if (m) put("rosenka_sen_per_m2", +m[1], m);
+    m = s.match(/(?:固定資産税|固都税)[^\d\n]{0,15}(\d+(?:\.\d+)?)\s*(万円|円)/); if (m) put("property_tax_man", m[2] === "円" ? +m[1] / 1e4 : +m[1], m);
+    m = s.match(/建物(?:価格)?[^\d\n]{0,8}(\d+(?:\.\d+)?)\s*万円/); if (m) put("building_price_man", +m[1], m);
+    if ((m = s.match(/新築|未入居/))) put("is_new", true, m);
+    const notes = ["再建築不可", "借地", "既存不適格", "容積率超過", "告知事項", "サブリース", "セットバック"].filter((w) => s.includes(w)).map((w) => `「${w}」の記載あり`);
+    const o = { notes, rent_roll: [] };
+    Object.keys(f).forEach((k) => (o[k] = f[k]));
+    if (/鉄骨/.test(s) && !f.structure) o._structNote = "鉄骨造（重量・軽量／肉厚の記載なし）";
+    return o;
+  }
+
+  function applyExtract(d, how, text, viaImage) {
+    if (!d || typeof d !== "object") { status("読み取れる項目がありませんでした。", true); return; }
+    const got = [], miss = [], rejected = [];
+    const unmiss = (label) => { const i = miss.indexOf(label); if (i >= 0) miss.splice(i, 1); };
+    const ntext = norm(text);
+    srcMap = {};
+    // 値と根拠を取り出し、根拠が資料に無いものは使わない
+    const take = (key, label) => {
+      const raw = d[key];
+      if (raw === null || raw === undefined) { miss.push(label); return null; }
+      const obj = typeof raw === "object" && !Array.isArray(raw) ? raw : { value: raw, src: "" };
+      const v = obj.value, src = String(obj.src || "").trim();
+      if (v === null || v === undefined || v === "") { miss.push(label); return null; }
+      if (!src) { rejected.push(`${label}（根拠の記載なし）`); return null; }
+      if (!viaImage && ntext && !ntext.includes(norm(src))) { rejected.push(`${label}（根拠が資料に見つからない）`); return null; }
+      return { v, src };
+    };
+    const set = (id, v, label, src) => { $(id).value = v; $(id).closest(".in").classList.add("filled"); got.push(label); srcMap[id] = src; };
+
+    // 物件の事実はいったん空にする（前の物件の値を残さない）
+    FACTS.forEach((k) => { $(k).value = ""; const b = $(k).closest(".in"); if (b) b.classList.remove("filled"); delete estMode[k]; });
+    delete estMode.isNew;
+    setKind(null);
+    roll = [];
+
+    let x;
+    if ((x = take("name", "物件名"))) set("pname", String(x.v), "物件名", x.src);
+    if ((x = take("address", "所在地"))) set("addr", String(x.v), "所在地", x.src);
+    if ((x = take("is_new", "新築／中古"))) { setKind(x.v === true || x.v === "true"); got.push("新築／中古"); srcMap.isNew = x.src; }
+    const price = take("price_man", "価格");
+    if (price && +price.v > 0) set("price", +price.v, "価格", price.src);
+    const rr = Array.isArray(d.rent_roll) ? d.rent_roll.filter((r) => r && +r.area_m2 > 0 && +r.rent_yen > 0 && (viaImage || !r.src || !ntext || ntext.includes(norm(r.src)))) : [];
+    const gpi = take("annual_rent_full_man", "満室想定年収");
+    const yld = take("surface_yield_pct", "表面利回り");
+    if (gpi && +gpi.v > 0) set("gpi", Math.round(+gpi.v * 10) / 10, "満室想定年収", gpi.src);
+    else if (rr.length && rr.length === (+((d.units && d.units.value) || d.units) || rr.length)) {
+      const v = (rr.reduce((s, r) => s + +r.rent_yen, 0) * 12) / 1e4;
+      set("gpi", Math.round(v * 10) / 10, "満室想定年収（レントロール合計×12で算出）", "レントロールの賃料合計×12");
+      unmiss("満室想定年収");
+    } else if (price && yld && +price.v > 0 && +yld.v > 0) {
+      set("gpi", Math.round(((+price.v * +yld.v) / 100) * 10) / 10, "満室想定年収（価格×表面利回りで算出）", `${price.src}／${yld.src}`);
+      unmiss("満室想定年収");
+    }
+    const stc = take("structure", "構造");
+    const smap = { RC: 47, SRC: 47, S_heavy: 34, S_light_34: 27, S_light_3: 19, W: 22 };
+    if (stc && smap[stc.v]) set("struct", smap[stc.v], "構造", stc.src);
+    else if (d._structNote) { unmiss("構造"); miss.push("構造（鉄骨の肉厚の記載なし。選択してください）"); }
+    const by = take("built_year", "築年");
+    if (by && +by.v > 1900 && isNew !== true) set("age", Math.max(0, YEAR - +by.v), `築年数（${by.v}年築から算出）`, by.src);
+    if ((x = take("land_area_m2", "土地面積")) && +x.v > 0) set("landArea", +x.v, "土地面積", x.src);
+    if ((x = take("floor_area_m2", "延床面積")) && +x.v > 0) set("floorArea", +x.v, "延床面積", x.src);
+    if ((x = take("rosenka_sen_per_m2", "路線価")) && +x.v > 0) set("rosen", +x.v, "路線価", x.src);
+    if ((x = take("property_tax_man", "固都税")) && +x.v >= 0) set("ptax", +x.v, "固都税", x.src);
+    const bp = take("building_price_man", "建物価格");
+    if (bp && price && +bp.v > 0 && +price.v > 0) set("bldg", Math.round((+bp.v / +price.v) * 1000) / 10, "建物価格比率（建物価格÷価格で算出）", bp.src);
+    if (rr.length) {
+      roll = rr.map((r, i) => ({ room: String(r.room ?? i + 1), area: +r.area_m2, rent: +r.rent_yen, occ: r.vacant ? "vacant" : "occ" }));
+      got.push(`レントロール${rr.length}室`);
+    } else miss.push("レントロール");
+    extNotes = Array.isArray(d.notes) ? d.notes.filter(Boolean).slice(0, 8).map(String) : [];
+
+    $("exampleTag").hidden = true;
+    $("found").innerHTML = got.map((g) => `<span>${esc(g)}</span>`).join("") + miss.map((g) => `<span class="miss">${esc(g)}：記載なし</span>`).join("") + rejected.map((g) => `<span class="miss">不採用：${esc(g)}</span>`).join("");
+    const srcRows = Object.keys(srcMap).map((k) => `<tr><td>${esc(LABEL[k] || (k === "isNew" ? "新築／中古" : k))}</td><td>${esc(k === "isNew" ? (isNew ? "新築" : "中古") : $(k).value)}</td><td>${esc(srcMap[k])}</td></tr>`);
+    $("srcBox").hidden = srcRows.length === 0;
+    $("srcTable").innerHTML = `<tr><th>項目</th><th>反映した値</th><th>資料の記載</th></tr>` + srcRows.join("");
+    status(`${how === "AI" ? "AI" : "簡易読み取り"}で資料に記載のある${got.length}項目を反映しました。続けて未入力の項目を推定で補完します。` + (viaImage ? "画像から読み取った値は、根拠の表で原本と照合してください。" : ""));
+    render();
+    estimateMissing();
+  }
+
+  // ---------- 未入力の推定 ----------
+  // 1) AI：所在地から路線価・相場賃料・還元利回りの概算（AIが使える場合）
+  // 2) 計算ルール：資料の他の数値や税制の標準的な計算から導く
+  let estBusy = false;
+  async function estimateMissing() {
+    if (estBusy) return;
+    estBusy = true;
+    const btns = [$("estBtn"), $("estBtn2")];
+    btns.forEach((b) => (b.disabled = true));
+    const done = [], cannot = [];
+    const say = (t) => { $("estStatus").textContent = t; status(t); };
+    const blank = (k) => $(k).value === "";
+    const put = (k, v, why, digits = 1) => {
+      if (!fin(v) || !blank(k)) return false;
+      const m = Math.pow(10, digits);
+      $(k).value = Math.round(v * m) / m;
+      estMode[k] = why; genMode[k] = false; done.push(LABEL[k]);
+      return true;
+    };
+    try {
+      let p = read();
+      // --- AI による地域相場 ---
+      const wantAI = sampleFn && (p.addr || "").trim() && (blank("rosen") || blank("mkt") || genMode.bCap || genMode.cap);
+      if (wantAI) {
+        say("AIで所在地の路線価・相場賃料・利回りを推定しています（30秒ほど）…");
+        const rs0 = rentStats(p);
+        const areas = rs0 ? [...new Set(rs0.items.filter((x) => x.area > 0).map((x) => x.area))].slice(0, 8).join("㎡、") + "㎡" : "不明";
+        try {
+          const r = await sampleFn.json(`日本の収益不動産の概算評価です。次の物件について、あなたの知識の範囲で概算値を推定し、JSONオブジェクト1つで答えてください。
+所在地：${p.addr}
+構造：${fin(p.struct) ? $("struct").selectedOptions[0].text : "不明"}／築年数：${fin(p.age) ? p.age + "年" : p.isNew ? "新築" : "不明"}／主な専有面積：${areas}
+{"rosen_sen_per_m2": {"value": 相続税路線価の概算(千円/㎡、前面道路の住宅地の水準), "basis": "根拠40字以内"},
+ "market_rent_yen_per_m2": {"value": この立地・構造・築年・広さの共益費込み月額賃料単価(円/㎡), "basis": "根拠40字以内"},
+ "cap_rate_pct": {"value": この地域・築年帯の一棟収益物件の取引利回り(NOIベース、%), "basis": "根拠40字以内"},
+ "surface_yield_pct": {"value": この地域・築年帯の一棟収益物件の売買時の表面利回り(%), "basis": "根拠40字以内"}}
+所在地が市区町村まで特定できない、または見当がつかない項目は value を null にしてください。`, { modelTier: "default" });
+          const g = (o) => (o && typeof o === "object" ? o : { value: o });
+          const ro = g(r.rosen_sen_per_m2), mk = g(r.market_rent_yen_per_m2), cp = g(r.cap_rate_pct), sy = g(r.surface_yield_pct);
+          if (+ro.value > 0) put("rosen", +ro.value, `AIによる概算（${ro.basis || "所在地の水準"}）。国税庁の路線価図で確認してください`, 0);
+          if (+mk.value > 0) put("mkt", +mk.value, `AIによる概算（${mk.basis || "周辺の相場水準"}）。近隣の募集事例で確認してください`, 0);
+          if (+cp.value > 0 && +cp.value < 20) {
+            if (genMode.bCap) { genMode.bCap = false; $("bCap").value = ""; put("bCap", +cp.value + 0.5, `AIによる地域の取引利回り${cp.value}%＋0.5%（金融機関は市場より保守的に見る）`); }
+          }
+          if (+sy.value > 0 && +sy.value < 25 && genMode.cap) { genMode.cap = false; $("cap").value = ""; estMode._capAI = +sy.value; }
+        } catch (e) {
+          if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) sampleFn = null;
+          cannot.push("AIによる地域相場（" + (e && e.code === "rate_limited" ? "利用上限" : "取得できませんでした") + "）");
+        }
+      }
+      const why = !sampleFn ? "AIが使えないため" : !(p.addr || "").trim() ? "所在地が未入力のため" : "";
+      if (why) ["rosen", "mkt"].forEach((k) => { if (blank(k)) cannot.push(`${LABEL[k]}（${why}）`); });
+
+      p = read();
+      // --- 新築／中古 ---
+      if (p.isNew !== true && p.isNew !== false) {
+        if (fin(p.age)) { setKind(p.age === 0); estMode.isNew = p.age === 0 ? "築0年のため新築と判断" : `築${p.age}年のため中古と判断`; }
+        else { setKind(false); estMode.isNew = "記載が無いため、流通の大半を占める中古（仲介）と仮定"; }
+        done.push("新築／中古");
+        p = read();
+      }
+      const legal = p.struct, isN = p.isNew === true;
+      const remain = fin(legal) ? (isN ? legal : fin(p.age) ? Math.max(0, legal - p.age) : NaN) : NaN;
+      const rs = rentStats(p);
+      // --- 延床面積：レントロールの専有面積から ---
+      if (blank("floorArea") && rs) put("floorArea", rs.area / 0.85, `レントロールの専有面積合計${fmt(rs.area, 1)}㎡÷0.85（共用部15%を加算）`);
+      p = read();
+      // --- 満室想定年収 ---
+      if (blank("gpi")) {
+        if (rs) put("gpi", rs.rollGpi, "レントロールの賃料合計×12");
+        else if (fin(p.mkt) && fin(p.floorArea)) put("gpi", (p.floorArea * 0.85 * p.mkt * 12) / 1e4, `延床${p.floorArea}㎡×専有率85%×相場${p.mkt}円/㎡×12`);
+      }
+      p = read();
+      // --- 再調達単価（一般値が構造未選択で空のとき） ---
+      // --- 固定資産税評価額の概算 → 固都税・建物価格比率 ---
+      const repro = fin(p.repro) ? p.repro : reproFor(legal);
+      const hasLand = fin(p.landArea) && fin(p.rosen);
+      const hasBldg = fin(p.floorArea) && fin(legal) && fin(repro) && (isN || fin(p.age));
+      const landEval = hasLand ? (p.landArea * p.rosen * 1000 * 0.875) / 1e4 : NaN; // 路線価÷0.8×0.7
+      const resid = hasBldg ? Math.max(0.2, 1 - ((isN ? 0 : p.age) / legal) * 0.8) : NaN;
+      const bldgEval = hasBldg ? p.floorArea * repro * 0.5 * resid : NaN; // 建築費の5割×経年
+      if (blank("ptax")) {
+        if (hasLand && hasBldg) put("ptax", landEval * (0.014 / 6 + 0.003 / 3) + bldgEval * 0.017,
+          `固定資産税評価額の概算（土地 路線価÷0.8×70%=${fmt(landEval, 0)}万円に住宅用地特例、建物 ${fmt(bldgEval, 0)}万円）×税率1.4%＋0.3%`);
+        else if (fin(p.gpi)) put("ptax", p.gpi * 0.06, "満室年収の6%（一棟住宅の固都税の一般的な水準）");
+      }
+      if (blank("bldg")) {
+        if (hasLand && hasBldg) put("bldg", (bldgEval / (bldgEval + landEval)) * 100, `固定資産税評価額の概算で按分（土地${fmt(landEval, 0)}：建物${fmt(bldgEval, 0)}万円）`, 0);
+        else if (fin(legal) && fin(remain)) put("bldg", Math.max(10, Math.min(60, 10 + 50 * (remain / legal))), `構造と残存耐用年数${remain}/${legal}年からの目安`, 0);
+      }
+      // --- 税率 ---
+      if (blank("taxr")) put("taxr", 33, "課税所得695〜900万円の所得税23%（復興税込で約23.5%）＋住民税10%を想定", 0);
+      // --- 融資条件 ---
+      p = read();
+      if (blank("loan") && fin(p.price)) { put("loan", Math.round(p.price * 0.9 / 10) * 10, "物件価格の90%（自己資金で諸費用＋1割を入れる一般的な組み方）", 0); finSrc = "rough"; }
+      if (blank("rate") && !(+$("loan").value === 0)) { put("rate", 2.0, "地方銀行・信用金庫の一般的な目安"); finSrc = "rough"; }
+      if (blank("term") && !(+$("loan").value === 0)) {
+        if (fin(remain)) put("term", Math.max(10, Math.min(35, remain)), remain >= 10 ? `残存法定耐用年数${remain}年（多くの金融機関の上限）` : `残存耐用年数${remain}年だが、経過年数で10年程度の融資を出す金融機関がある前提`, 0);
+        else put("term", 25, "構造・築年が不明のため一般的な25年", 0);
+        finSrc = "rough";
+      }
+      // --- 大規模修繕 ---
+      p = read();
+      if (blank("repYear") && blank("repAmt") && fin(p.floorArea) && fin(legal) && (isN || fin(p.age))) {
+        const cycle = legal === 22 ? 12 : 15, age = isN ? 0 : p.age;
+        const next = age % cycle === 0 && age > 0 ? 1 : cycle - (age % cycle);
+        put("repYear", next, `${cycle}年周期の外壁・防水改修。築${age}年から逆算`, 0);
+        put("repAmt", p.floorArea * (legal === 22 ? 0.8 : 1.0), `延床${p.floorArea}㎡×${legal === 22 ? "0.8" : "1.0"}万円/㎡`, 0);
+      }
+      // --- 売却時利回り（AIの地域利回りがあれば優先） ---
+      if (estMode._capAI) {
+        const v = estMode._capAI; delete estMode._capAI;
+        const q0 = read();
+        const buy = fin(q0.gpi) && q0.price > 0 ? (q0.gpi / q0.price) * 100 : NaN;
+        const val = fin(buy) ? Math.max(v, buy) + 0.3 : v + 0.3;
+        put("cap", val, `AIによる地域の売買時の表面利回り${v}%${fin(buy) ? `と購入時の表面利回り${buy.toFixed(2)}%の高い方` : ""}＋0.3%（保有中の経年分）`);
+      }
+      // 推定できない項目
+      p = read();
+      ["price", "struct", "age", "landArea", "rosen", "mkt"].forEach((k) => {
+        if (k === "age" && p.isNew === true) return;
+        if (!fin(p[k]) && !cannot.some((c) => c.includes(LABEL[k]))) cannot.push(LABEL[k]);
+      });
+      if (!rs) cannot.push("レントロール");
+      markEst(); markGeneral();
+      const msg = (done.length ? `推定で${done.length}項目を補完しました（${done.join("・")}）。` : "推定で補完できる項目はありませんでした。")
+        + (cannot.length ? ` 根拠が無く推定できない項目：${cannot.join("、")}。資料で確認してください。` : "");
+      say(msg);
+    } finally {
+      estBusy = false;
+      btns.forEach((b) => (b.disabled = false));
+      render();
+    }
+  }
+
+  // ---------- AI：総合所見 ----------
+  $("memoBtn").addEventListener("click", async () => {
+    if (!current) return;
+    const { p, a, rs, sk, bk, j, sc } = current;
+    const memo = $("memo"), st = $("memoStatus");
+    memo.textContent = ""; st.textContent = "考えています…";
+    $("memoBtn").disabled = true;
+    const best = bestExit(a);
+    const lack = GROUPS.filter((g) => !a.ok[g.key]).map((g) => `${g.name}（${a.miss[g.key].join("、")}）`);
+    const facts = [
+      `物件：${p.pname || "名称未入力"}（${p.addr || "所在地未入力"}）${p.isNew ? "新築" : "中古"}・${$("struct").selectedOptions[0].text}・築${a.p.age}年`,
+      `価格${fmt(p.price)}万円、満室年収${fmt(p.gpi)}万円、表面${pct(a.surface)}、FCR${pct(a.fcr)}、K${pct(a.k)}`,
+      `借入${fmt(a.loan)}万円・金利${a.p.rate}%（${{ var: "変動", fix: "固定", unknown: "種類未定" }[p.finType] || "種類未入力"}${p.finSrc === "rough" ? "・打診前の目安" : p.finSrc === "offer" ? "・金融機関の提示条件" : ""}）・${a.p.term}年、自己資金${fmt(a.equity)}万円、DSCR${a.loan > 0 ? a.dscr.toFixed(2) : "借入なし"}、損益分岐入居率${pct(a.ber, 1)}`,
+      `初年度税引前CF${fmt(a.y1.btcf, 1)}万円` + (a.ok.tax ? `、税引後${fmt(a.y1.atcf, 1)}万円` : ""),
+      a.ok.exit ? `${a.H}年保有で売却：手取り${fmt(a.s.net)}万円、IRR${pct(a.irr)}。IRR最大は${best ? best.h + "年目" : "—"}` : "",
+      a.ok.tax ? `デッドクロス${a.deadCross || "なし"}年目` : "",
+      rs ? `レントロール${rs.n}戸・入居率${pct(rs.occRate, 0)}・平均${fmt(rs.unitAvg)}円/㎡` + (fin(rs.mkt) ? `、相場${rs.mkt}円/㎡、相場超${rs.over.length}室` : "") : "",
+      sk.ok ? `積算${fmt(sk.total)}万円（価格比${pct(sk.ratio, 0)}）` : "",
+      bk.ok ? `銀行評価：直接還元${fmt(bk.direct)}万円、DCF${fmt(bk.dcf)}万円、融資見込み${fmt(bk.best)}万円` : "",
+      `総合スコア${fin(sc.total) ? sc.total + "点（" + sc.grade + "）" : "なし"}、採点${sc.nScored}/${sc.nItems}項目`,
+      "自動チェックの指摘：" + j.al.map((x) => x.t.replace(/<[^>]+>/g, "")).join(" / "),
+      lack.length ? `データ不足の分野：${lack.join("／")}` : "",
+      (() => { const e = Object.keys(estMode).filter((k) => estMode[k] && k[0] !== "_"); return e.length ? `推定値の項目：${e.map((k) => k === "isNew" ? `新築／中古（${estMode[k]}）` : `${LABEL[k]}=${$(k).value}（${estMode[k]}）`).join("、")}` : ""; })(),
+      (() => { const g = Object.keys(GENERAL).filter((k) => genMode[k]); return g.length ? `一般値（目安）で置いている前提：${g.map((k) => `${LABEL[k]}=${$(k).value}`).join("、")}` : ""; })(),
+    ].filter(Boolean).join("\n");
+    try {
+      const { text } = await sampleFn(`あなたは個人投資家の立場に立つ、収益不動産の投資アドバイザーです。次の試算結果だけをもとに、購入判断のための所見を日本語で書いてください。
+厳守：下に書かれていない数字・相場・地域情報を作らない、推測で補わない。データ不足の分野は「データ不足のため判断できない」と明記し、何を確認すれば判断できるかを書く。
+構成：1) 結論（買う／条件付き／見送り／判断保留 と理由を2文）2) 最大のリスク3つ 3) 価格交渉・融資条件で改善すべき点（試算値から計算できる範囲で数字を示す）4) 購入前に確認すべきこと5つ（未入力の項目を優先）。
+見出しは【】で囲み、全体で700字程度。
+
+${facts}`, { signal: (ctl = new AbortController()).signal, onText: ({ text }) => { memo.textContent = text; st.textContent = ""; } });
+      memo.textContent = text;
+      st.textContent = "AIの所見は入力された値だけに基づく参考意見です。";
+    } catch (e) {
+      memo.textContent = e && e.text ? e.text : "";
+      st.textContent = e && e.code === "cancelled" ? "" : errText(e);
+    } finally { $("memoBtn").disabled = false; }
+  });
+
+  // ---------- 融資条件の質問 ----------
+  let finType = null, finSrc = null;
+  let wiz = null;
+  function openWiz() {
+    const p = read();
+    wiz = { i: 0, ans: { method: null, status: null, loanMode: null, loan: fin(p.loan) && p.loan > 0 ? p.loan : NaN, equity: NaN, type: finType, rate: fin(p.rate) ? p.rate : NaN, term: fin(p.term) ? p.term : NaN }, err: "" };
+    $("finWiz").hidden = false;
+    drawWiz();
+    $("finWiz").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function wizSteps() {
+    const a = wiz.ans;
+    if (a.method === "cash") return ["method", "confirm"];
+    return ["method", "status", "loan", "type", "rate", "term", "confirm"];
+  }
+  function priceInfo() {
+    const p = read(), q = calcValues(p);
+    const price = fin(p.price) ? p.price : NaN;
+    const ic = initCosts(Object.assign({}, q, { loan: fin(p.loan) ? p.loan : fin(price) ? price * 0.9 : 0 }));
+    const total = fin(price) ? price + ic.brokerage + (fin(p.otherRate) ? (price * p.otherRate) / 100 : ic.other) : NaN;
+    const remain = fin(p.struct) ? (p.isNew === true ? p.struct : fin(p.age) ? Math.max(0, p.struct - p.age) : NaN) : NaN;
+    return { price, total, remain };
+  }
+  const opt = (val, title, sub, sel) => `<button type="button" class="wiz-opt" data-v="${val}" aria-pressed="${sel ? "true" : "false"}"><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</button>`;
+  const numBox = (id, val, unit, ph) => `<div class="wiz-num"><div class="in"><input id="${id}" type="number" step="any" value="${fin(val) ? val : ""}" placeholder="${ph || ""}"><span class="u">${unit}</span></div></div>`;
+  function drawWiz() {
+    const steps = wizSteps(), key = steps[wiz.i], a = wiz.ans, pi = priceInfo();
+    $("wizStep").textContent = `${wiz.i + 1} / ${steps.length}`;
+    $("wizProg").innerHTML = steps.map((_, i) => `<i class="${i <= wiz.i ? "on" : ""}"></i>`).join("");
+    $("wizBack").disabled = wiz.i === 0;
+    $("wizNext").textContent = key === "confirm" ? "この条件で反映する" : "次へ";
+    let h = "";
+    if (key === "method") {
+      h = `<p class="wiz-q">購入資金はどのように用意しますか？</p><p class="wiz-help">融資を使う場合は、このあと借入額・金利・期間を順にお聞きします。</p>
+        <div class="wiz-opts">${opt("loan", "融資を使う", "金融機関から借り入れる", a.method === "loan")}${opt("cash", "現金で購入", "借入なし（借入額0）", a.method === "cash")}</div>`;
+    } else if (key === "status") {
+      h = `<p class="wiz-q">金融機関から融資条件は出ていますか？</p><p class="wiz-help">提示された条件があれば、その数字をそのまま入力します。まだの場合は一般的な目安から選べます（目安であることは判定欄に表示されます）。</p>
+        <div class="wiz-opts">${opt("offer", "条件の提示を受けている", "金融機関の回答・事前審査の結果がある", a.status === "offer")}${opt("rough", "まだ打診していない", "一般的な目安で試算する", a.status === "rough")}</div>`;
+    } else if (key === "loan") {
+      const hasP = fin(pi.price);
+      const ratios = [[1, "フルローン（価格の100%）"], [0.9, "価格の90%"], [0.8, "価格の80%"], [0.7, "価格の70%"]];
+      h = `<p class="wiz-q">いくら借りますか？</p><p class="wiz-help">${hasP ? `物件価格 ${fmt(pi.price, 0)}万円、諸費用込みの総投資額 ${fmt(pi.total, 0)}万円です。` : "物件価格が未入力のため、金額で入力してください。"}${a.status === "offer" ? "提示された借入額を入力してください。" : ""}</p>
+        ${hasP ? `<div class="wiz-opts">${ratios.map(([r, t]) => opt("r" + r, t, `${fmt(pi.price * r, 0)}万円`, a.loanMode === "r" + r)).join("")}${opt("over", "諸費用込み（オーバーローン）", `${fmt(pi.total, 0)}万円`, a.loanMode === "over")}${opt("eq", "自己資金の額から決める", "総投資額−自己資金", a.loanMode === "eq")}${opt("amt", "金額を入力する", "", a.loanMode === "amt")}</div>` : ""}
+        ${!hasP || a.loanMode === "amt" ? numBox("wLoan", a.loan, "万円", "借入額") : ""}
+        ${hasP && a.loanMode === "eq" ? numBox("wEq", a.equity, "万円（自己資金）", "自己資金") : ""}`;
+    } else if (key === "type") {
+      h = `<p class="wiz-q">金利のタイプはどれですか？</p><p class="wiz-help">変動金利の場合は、金利上昇時の影響を判定欄で注意喚起します。</p>
+        <div class="wiz-opts">${opt("var", "変動金利", "市場金利に合わせて見直される", a.type === "var")}${opt("fix", "固定金利", "期間中（または一定期間）金利が変わらない", a.type === "fix")}${opt("unknown", "まだ分からない", "", a.type === "unknown")}</div>`;
+    } else if (key === "rate") {
+      const tiers = [[1.0, "1.0%", "都市銀行・属性が良い場合の目安"], [2.0, "2.0%", "地方銀行・信用金庫の一般的な目安"], [3.0, "3.0%", "一部の信金・ノンバンク系の目安"], [4.0, "4.0%", "ノンバンク系の目安"]];
+      h = `<p class="wiz-q">金利は何%ですか？</p><p class="wiz-help">${a.status === "offer" ? "提示された金利を入力してください。" : "打診前の場合は目安から選ぶか、分かっていれば入力してください。"}</p>
+        ${a.status === "rough" ? `<div class="wiz-opts">${tiers.map(([v, t, sub]) => opt("t" + v, t, sub, a.rateMode === "t" + v)).join("")}${opt("in", "数値を入力する", "", a.rateMode === "in")}</div>` : ""}
+        ${a.status === "offer" || a.rateMode === "in" ? numBox("wRate", a.rate, "%", "例 2.2") : ""}`;
+    } else if (key === "term") {
+      const rem = pi.remain;
+      const choices = [];
+      if (fin(rem) && rem > 0) choices.push(["rem", `残存耐用年数（${Math.min(rem, 35)}年）`, "多くの金融機関が上限とする期間", Math.min(rem, 35)]);
+      [35, 30, 25, 20].forEach((y) => { if (!(fin(rem) && y === Math.min(rem, 35))) choices.push(["y" + y, `${y}年`, fin(rem) && y > rem ? `残存耐用年数${rem}年を超えます` : "", y]); });
+      h = `<p class="wiz-q">返済期間は何年ですか？</p><p class="wiz-help">${fin(rem) ? `この物件の残存法定耐用年数は${rem}年です。` : "構造・築年数が未入力のため、残存耐用年数は表示できません。"}${a.status === "offer" ? "提示された期間を選ぶか入力してください。" : ""}</p>
+        <div class="wiz-opts">${choices.map(([k, t, sub]) => opt(k, t, sub, a.termMode === k)).join("")}${opt("in", "年数を入力する", "", a.termMode === "in")}</div>
+        ${a.termMode === "in" ? numBox("wTerm", a.term, "年", "例 25") : ""}`;
+      wiz.termChoices = choices;
+    } else if (key === "confirm") {
+      const rows = a.method === "cash" ? [["購入方法", "現金（借入なし）"]] : (() => {
+        const r = a.rate / 100 / 12, n = Math.round(a.term * 12);
+        const pm = r > 0 ? (a.loan * r) / (1 - Math.pow(1 + r, -n)) : a.loan / n;
+        return [["借入額", fmt(a.loan, 0) + "万円"], ["金利", `${a.rate}%（${{ var: "変動", fix: "固定", unknown: "未定" }[a.type]}）`], ["期間", a.term + "年"],
+          ["月額返済", fmt(pm, 1) + "万円"], ["年間返済", fmt(pm * 12, 0) + "万円"], ["自己資金", fin(pi.total) ? fmt(pi.total - a.loan, 0) + "万円" : "価格・諸費用率の入力後に計算"],
+          ["条件の出どころ", a.status === "offer" ? "金融機関の提示条件" : "打診前の目安"]];
+      })();
+      h = `<p class="wiz-q">この条件で反映しますか？</p><p class="wiz-help">反映すると左の入力欄に入り、すべての分析が更新されます。あとから入力欄で直接変更することもできます。</p>
+        <div class="wiz-sum">${rows.map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("")}</div>`;
+    }
+    $("wizBody").innerHTML = h + (wiz.err ? `<p class="wiz-err">${wiz.err}</p>` : "");
+    const firstNum = $("wizBody").querySelector("input");
+    if (firstNum) firstNum.focus();
+  }
+  $("wizBody").addEventListener("click", (e) => {
+    const b = e.target.closest(".wiz-opt");
+    if (!b) return;
+    const key = wizSteps()[wiz.i], a = wiz.ans, v = b.dataset.v, pi = priceInfo();
+    wiz.err = "";
+    if (key === "method") a.method = v;
+    else if (key === "status") a.status = v;
+    else if (key === "loan") {
+      a.loanMode = v;
+      if (v[0] === "r") a.loan = Math.round(pi.price * +v.slice(1));
+      else if (v === "over") a.loan = Math.round(pi.total);
+    } else if (key === "type") a.type = v;
+    else if (key === "rate") { a.rateMode = v; if (v[0] === "t") a.rate = +v.slice(1); }
+    else if (key === "term") { a.termMode = v; const c = (wiz.termChoices || []).find((x) => x[0] === v); if (c) a.term = c[3]; }
+    const needsInput = (key === "loan" && (v === "amt" || v === "eq")) || ((key === "rate" || key === "term") && v === "in");
+    if (needsInput) { drawWiz(); return; }
+    drawWiz();
+    if (key !== "confirm") setTimeout(next, 120);
+  });
+  $("wizBody").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); next(); } });
+  function next() {
+    const steps = wizSteps(), key = steps[wiz.i], a = wiz.ans, pi = priceInfo();
+    const num = (id) => { const el = $(id); return el && el.value !== "" ? parseFloat(el.value) : NaN; };
+    wiz.err = "";
+    if (key === "method" && !a.method) wiz.err = "どちらかを選んでください。";
+    if (key === "status" && !a.status) wiz.err = "どちらかを選んでください。";
+    if (key === "loan") {
+      if ($("wLoan")) a.loan = num("wLoan");
+      if ($("wEq")) { a.equity = num("wEq"); a.loan = fin(a.equity) ? Math.round(pi.total - a.equity) : NaN; }
+      if (!fin(a.loan) || a.loan <= 0) wiz.err = "借入額を選ぶか入力してください。";
+    }
+    if (key === "type" && !a.type) wiz.err = "いずれかを選んでください。";
+    if (key === "rate") { if ($("wRate")) a.rate = num("wRate"); if (!fin(a.rate) || a.rate < 0 || a.rate > 20) wiz.err = "金利を0〜20%の範囲で選ぶか入力してください。"; }
+    if (key === "term") { if ($("wTerm")) a.term = num("wTerm"); if (!fin(a.term) || a.term < 1 || a.term > 50) wiz.err = "期間を1〜50年の範囲で選ぶか入力してください。"; }
+    if (wiz.err) { drawWiz(); return; }
+    if (key === "confirm") { applyWiz(); return; }
+    wiz.i = Math.min(steps.length - 1, wiz.i + 1);
+    drawWiz();
+  }
+  function applyWiz() {
+    const a = wiz.ans;
+    if (a.method === "cash") { $("loan").value = 0; $("rate").value = ""; $("term").value = ""; finType = null; finSrc = null; }
+    else { $("loan").value = a.loan; $("rate").value = a.rate; $("term").value = a.term; finType = a.type; finSrc = a.status; }
+    ["loan", "rate", "term"].forEach((k) => $(k).closest(".in").classList.add("filled"));
+    $("finWiz").hidden = true;
+    wiz = null;
+    render();
+  }
+  $("wizNext").addEventListener("click", next);
+  $("wizBack").addEventListener("click", () => { if (wiz.i > 0) { wiz.i--; wiz.err = ""; drawWiz(); } });
+  $("wizClose").addEventListener("click", () => { $("finWiz").hidden = true; wiz = null; });
+  $("finAsk").addEventListener("click", openWiz);
+  $("finAsk2").addEventListener("click", openWiz);
+  ["loan", "rate", "term"].forEach((k) => $(k).addEventListener("input", () => { if (k !== "loan" || +$("loan").value > 0) finSrc = finSrc === "rough" || finSrc === "offer" ? "manual" : finSrc; }));
+
+  // ---------- 起動 ----------
+  applyGeneral();
+  render();
+  (async () => {
+    try {
+      const s = window.claude && (await window.claude.use("sample"));
+      if (!s) return;
+      sampleFn = s;
+      imgLimits = (await s.limits().catch(() => null))?.images || null;
+      if (current) $("memoBar").hidden = false;
+      status("ファイルを選ぶか、テキストを貼り付けてください。AIが資料に記載のある項目だけを読み取ります。");
+    } catch (e) { /* AIなしでも簡易読み取りで動作 */ }
+  })();
+})();
+</script>
