@@ -213,6 +213,8 @@ details.src summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 details.src td:last-child { white-space: normal; font-family: var(--f-body); color: var(--ink-2); text-align: left; min-width: 18em; }
 .head-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .in.general { border-color: var(--line); background: var(--panel); }
+.etag { display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--warn); background: var(--warn-soft); border-radius: 3px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+.in.est { border-color: var(--warn); background: var(--warn-soft); }
 .gtag { display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
 .gen-list { font-size: .8rem; color: var(--ink-2); margin: 10px 0 0; }
 /* 融資条件の質問 */
@@ -247,6 +249,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     <div class="head-btns">
       <span class="example" id="exampleTag" hidden>サンプル物件の値を表示中（実在の物件ではありません）</span>
       <button class="btn ghost sm" type="button" id="sampleBtn">サンプル物件で試す</button>
+      <button class="btn sm" type="button" id="estBtn">未入力を推定して補完</button>
       <button class="btn ghost sm" type="button" id="genBtn">前提を一般値に戻す</button>
       <button class="btn ghost sm" type="button" id="clearBtn">入力をすべて消去</button>
     </div>
@@ -374,6 +377,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
       <section class="card" aria-labelledby="h-need" id="needCard">
         <h2 id="h-need">入力データの状況 <small id="needSub"></small></h2>
+        <div class="row-btns" id="estBar" hidden style="margin:-4px 0 12px"><button class="btn sm" type="button" id="estBtn2">未入力を推定して補完</button><span class="status" id="estStatus"></span></div>
         <div class="row-btns" id="finAskBar" hidden style="margin:-4px 0 12px"><button class="btn sm" type="button" id="finAsk2">融資条件を質問に答えて入力</button><span class="status">借入額・金利・期間が未入力です</span></div>
         <div class="need-grid" id="needGrid"></div>
         <p class="gen-list" id="genList"></p>
@@ -591,6 +595,20 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     if (g.v !== null) $(k).value = g.v;
     else $(k).value = "";
     markGeneral();
+  }
+  const estMode = {}; // 推定で補完した項目 → 根拠
+  function markEst() {
+    NUM.concat(TXT).forEach((k) => {
+      const box = $(k).closest(".in"), f = $(k).closest(".f");
+      if (!box) return;
+      box.classList.toggle("est", !!estMode[k]);
+      if (estMode[k]) $(k).title = "推定：" + estMode[k];
+      const lab = f && f.querySelector("label");
+      if (!lab) return;
+      let tag = lab.querySelector(".etag");
+      if (estMode[k] && !tag) { tag = document.createElement("span"); tag.className = "etag"; tag.textContent = "推定"; lab.appendChild(tag); }
+      if (!estMode[k] && tag) tag.remove();
+    });
   }
   function markGeneral() {
     Object.keys(GENERAL).forEach((k) => {
@@ -919,6 +937,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     if (p.isNew === false && p.age >= a.legal) add("warn", `<b>法定耐用年数を経過した物件です。</b>償却は${a.lifeS}年で終わり、融資期間も短くなりがちです。`);
     extNotes.forEach((t) => add("warn", `<b>資料記載：</b>${esc(t)}`));
     const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
+    const ests = Object.keys(estMode).filter((k) => estMode[k] && k[0] !== "_");
+    if (ests.length) add("warn", `<b>推定値で計算している項目：</b>${ests.map((k) => k === "isNew" ? "新築／中古" : LABEL[k]).join("・")}。資料・金融機関・現地で確認して置き換えてください（入力欄の「推定」の印にカーソルを合わせると根拠が出ます）。`);
     if (gens.length) add("info", `<b>一般値で計算している前提：</b>${gens.map((k) => LABEL[k]).join("・")}。物件の実態や金融機関の基準が分かれば置き換えてください。`);
     const lackGroups = GROUPS.filter((g) => !a.ok[g.key]).map((g) => g.name);
     if (lackGroups.length) add("info", `<b>データ不足で判定していない分野：</b>${lackGroups.join("・")}。判定はこれらを含みません。`);
@@ -1013,7 +1033,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       <circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--line)" stroke-width="10"/>
       <circle cx="75" cy="75" r="${R}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C * f} ${C}" transform="rotate(-90 75 75)"/>
       <text x="75" y="84" text-anchor="middle" class="num">${fin(sc.total) ? sc.total : "—"}</text><text x="75" y="104" text-anchor="middle" class="of">/ 100</text></svg>
-      <span class="grade ${gcls(sc.grade)}">${sc.grade}　${sc.gradeText}${fin(sc.total) && sc.coverage < 100 ? "（暫定）" : ""}</span>`;
+      <span class="grade ${gcls(sc.grade)}">${sc.grade}　${sc.gradeText}${fin(sc.total) && sc.coverage < 100 ? "（暫定）" : Object.keys(estMode).some((k) => k[0] !== "_" && estMode[k]) ? "（推定含む）" : ""}</span>`;
     $("cats").innerHTML = sc.cats.map((c) => {
       const v = c.na ? 0 : c.score;
       const bc = v >= 65 ? "var(--ok)" : v >= 50 ? "var(--accent)" : v >= 35 ? "var(--warn)" : "var(--neg)";
@@ -1110,6 +1130,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     }));
     NUM.forEach((k) => { const box = $(k).closest(".in"); if (box) box.classList.toggle("missing", missIds.has(k)); });
     $("kindSeg").style.outline = p.isNew === null ? "1.5px dashed var(--warn)" : "";
+    $("estBar").hidden = GROUPS.every((g) => st.m[g.key].length === 0);
     $("finAskBar").hidden = fin(p.loan) && (p.loan === 0 || (fin(p.rate) && fin(p.term)));
     const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
     $("genList").innerHTML = gens.length ? `<b>一般値を入れている前提（${gens.length}項目）：</b>` + gens.map((k) => `${LABEL[k]} ${$(k).value !== "" ? esc($(k).tagName === "SELECT" ? $(k).selectedOptions[0].text : $(k).value) : "（" + (k === "cap" ? "基本の収支が揃うと自動計算" : "構造を選ぶと自動設定") + "）"}`).join("、") + "。入力欄の「一般値」の印は、値を書き換えると外れます。各値の根拠は入力欄にカーソルを合わせると表示されます。" : "";
@@ -1365,7 +1386,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     finType = p.finType || null; finSrc = p.finSrc || null;
     document.querySelectorAll(".in.filled").forEach((x) => x.classList.remove("filled"));
     Object.keys(GENERAL).forEach((k) => { genMode[k] = false; });
-    markGeneral();
+    Object.keys(estMode).forEach((k) => delete estMode[k]);
+    markGeneral(); markEst();
   }
   function applyGeneral() { Object.keys(GENERAL).forEach(setGeneral); }
   function setKind(n) {
@@ -1378,7 +1400,11 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
   // ---------- イベント ----------
   function onEdit() { render(); }
-  NUM.concat(TXT).forEach((k) => { $(k).addEventListener("input", () => { if (genMode[k]) { genMode[k] = false; markGeneral(); } onEdit(); }); });
+  NUM.concat(TXT).forEach((k) => { $(k).addEventListener("input", () => { if (genMode[k]) { genMode[k] = false; markGeneral(); } if (estMode[k]) { delete estMode[k]; markEst(); } onEdit(); }); });
+  $("kNew").addEventListener("click", () => { delete estMode.isNew; });
+  $("kUsed").addEventListener("click", () => { delete estMode.isNew; });
+  $("estBtn").addEventListener("click", () => estimateMissing());
+  $("estBtn2").addEventListener("click", () => estimateMissing());
   $("genBtn").addEventListener("click", () => { applyGeneral(); render(); });
   $("kNew").addEventListener("click", () => { setKind(true); onEdit(); });
   $("kUsed").addEventListener("click", () => { setKind(false); onEdit(); });
@@ -1617,7 +1643,8 @@ JSONオブジェクト1つだけで答える：
     const set = (id, v, label, src) => { $(id).value = v; $(id).closest(".in").classList.add("filled"); got.push(label); srcMap[id] = src; };
 
     // 物件の事実はいったん空にする（前の物件の値を残さない）
-    FACTS.forEach((k) => { $(k).value = ""; const b = $(k).closest(".in"); if (b) b.classList.remove("filled"); });
+    FACTS.forEach((k) => { $(k).value = ""; const b = $(k).closest(".in"); if (b) b.classList.remove("filled"); delete estMode[k]; });
+    delete estMode.isNew;
     setKind(null);
     roll = [];
 
@@ -1662,8 +1689,142 @@ JSONオブジェクト1つだけで答える：
     const srcRows = Object.keys(srcMap).map((k) => `<tr><td>${esc(LABEL[k] || (k === "isNew" ? "新築／中古" : k))}</td><td>${esc(k === "isNew" ? (isNew ? "新築" : "中古") : $(k).value)}</td><td>${esc(srcMap[k])}</td></tr>`);
     $("srcBox").hidden = srcRows.length === 0;
     $("srcTable").innerHTML = `<tr><th>項目</th><th>反映した値</th><th>資料の記載</th></tr>` + srcRows.join("");
-    status(`${how === "AI" ? "AI" : "簡易読み取り"}で資料に記載のある${got.length}項目を反映しました。記載の無い項目は空欄のままです。` + (viaImage ? "画像から読み取った値は、根拠の表で原本と照合してください。" : ""));
+    status(`${how === "AI" ? "AI" : "簡易読み取り"}で資料に記載のある${got.length}項目を反映しました。続けて未入力の項目を推定で補完します。` + (viaImage ? "画像から読み取った値は、根拠の表で原本と照合してください。" : ""));
     render();
+    estimateMissing();
+  }
+
+  // ---------- 未入力の推定 ----------
+  // 1) AI：所在地から路線価・相場賃料・還元利回りの概算（AIが使える場合）
+  // 2) 計算ルール：資料の他の数値や税制の標準的な計算から導く
+  let estBusy = false;
+  async function estimateMissing() {
+    if (estBusy) return;
+    estBusy = true;
+    const btns = [$("estBtn"), $("estBtn2")];
+    btns.forEach((b) => (b.disabled = true));
+    const done = [], cannot = [];
+    const say = (t) => { $("estStatus").textContent = t; status(t); };
+    const blank = (k) => $(k).value === "";
+    const put = (k, v, why, digits = 1) => {
+      if (!fin(v) || !blank(k)) return false;
+      const m = Math.pow(10, digits);
+      $(k).value = Math.round(v * m) / m;
+      estMode[k] = why; genMode[k] = false; done.push(LABEL[k]);
+      return true;
+    };
+    try {
+      let p = read();
+      // --- AI による地域相場 ---
+      const wantAI = sampleFn && (p.addr || "").trim() && (blank("rosen") || blank("mkt") || genMode.bCap || genMode.cap);
+      if (wantAI) {
+        say("AIで所在地の路線価・相場賃料・利回りを推定しています（30秒ほど）…");
+        const rs0 = rentStats(p);
+        const areas = rs0 ? [...new Set(rs0.items.filter((x) => x.area > 0).map((x) => x.area))].slice(0, 8).join("㎡、") + "㎡" : "不明";
+        try {
+          const r = await sampleFn.json(`日本の収益不動産の概算評価です。次の物件について、あなたの知識の範囲で概算値を推定し、JSONオブジェクト1つで答えてください。
+所在地：${p.addr}
+構造：${fin(p.struct) ? $("struct").selectedOptions[0].text : "不明"}／築年数：${fin(p.age) ? p.age + "年" : p.isNew ? "新築" : "不明"}／主な専有面積：${areas}
+{"rosen_sen_per_m2": {"value": 相続税路線価の概算(千円/㎡、前面道路の住宅地の水準), "basis": "根拠40字以内"},
+ "market_rent_yen_per_m2": {"value": この立地・構造・築年・広さの共益費込み月額賃料単価(円/㎡), "basis": "根拠40字以内"},
+ "cap_rate_pct": {"value": この地域・築年帯の一棟収益物件の取引利回り(表面ではなくNOIベース、%), "basis": "根拠40字以内"}}
+所在地が市区町村まで特定できない、または見当がつかない項目は value を null にしてください。`, { modelTier: "default" });
+          const g = (o) => (o && typeof o === "object" ? o : { value: o });
+          const ro = g(r.rosen_sen_per_m2), mk = g(r.market_rent_yen_per_m2), cp = g(r.cap_rate_pct);
+          if (+ro.value > 0) put("rosen", +ro.value, `AIによる概算（${ro.basis || "所在地の水準"}）。国税庁の路線価図で確認してください`, 0);
+          if (+mk.value > 0) put("mkt", +mk.value, `AIによる概算（${mk.basis || "周辺の相場水準"}）。近隣の募集事例で確認してください`, 0);
+          if (+cp.value > 0 && +cp.value < 20) {
+            if (genMode.bCap) { genMode.bCap = false; $("bCap").value = ""; put("bCap", +cp.value + 0.5, `AIによる地域の取引利回り${cp.value}%＋0.5%（金融機関は市場より保守的に見る）`); }
+            if (genMode.cap) { genMode.cap = false; $("cap").value = ""; estMode._capAI = +cp.value; }
+          }
+        } catch (e) {
+          if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) sampleFn = null;
+          cannot.push("AIによる地域相場（" + (e && e.code === "rate_limited" ? "利用上限" : "取得できませんでした") + "）");
+        }
+      }
+      const why = !sampleFn ? "AIが使えないため" : !(p.addr || "").trim() ? "所在地が未入力のため" : "";
+      if (why) ["rosen", "mkt"].forEach((k) => { if (blank(k)) cannot.push(`${LABEL[k]}（${why}）`); });
+
+      p = read();
+      // --- 新築／中古 ---
+      if (p.isNew !== true && p.isNew !== false) {
+        if (fin(p.age)) { setKind(p.age === 0); estMode.isNew = p.age === 0 ? "築0年のため新築と判断" : `築${p.age}年のため中古と判断`; }
+        else { setKind(false); estMode.isNew = "記載が無いため、流通の大半を占める中古（仲介）と仮定"; }
+        done.push("新築／中古");
+        p = read();
+      }
+      const legal = p.struct, isN = p.isNew === true;
+      const remain = fin(legal) ? (isN ? legal : fin(p.age) ? Math.max(0, legal - p.age) : NaN) : NaN;
+      const rs = rentStats(p);
+      // --- 延床面積：レントロールの専有面積から ---
+      if (blank("floorArea") && rs) put("floorArea", rs.area / 0.85, `レントロールの専有面積合計${fmt(rs.area, 1)}㎡÷0.85（共用部15%を加算）`);
+      p = read();
+      // --- 満室想定年収 ---
+      if (blank("gpi")) {
+        if (rs) put("gpi", rs.rollGpi, "レントロールの賃料合計×12");
+        else if (fin(p.mkt) && fin(p.floorArea)) put("gpi", (p.floorArea * 0.85 * p.mkt * 12) / 1e4, `延床${p.floorArea}㎡×専有率85%×相場${p.mkt}円/㎡×12`);
+      }
+      p = read();
+      // --- 再調達単価（一般値が構造未選択で空のとき） ---
+      // --- 固定資産税評価額の概算 → 固都税・建物価格比率 ---
+      const repro = fin(p.repro) ? p.repro : reproFor(legal);
+      const hasLand = fin(p.landArea) && fin(p.rosen);
+      const hasBldg = fin(p.floorArea) && fin(legal) && fin(repro) && (isN || fin(p.age));
+      const landEval = hasLand ? (p.landArea * p.rosen * 1000 * 0.875) / 1e4 : NaN; // 路線価÷0.8×0.7
+      const resid = hasBldg ? Math.max(0.2, 1 - ((isN ? 0 : p.age) / legal) * 0.8) : NaN;
+      const bldgEval = hasBldg ? p.floorArea * repro * 0.5 * resid : NaN; // 建築費の5割×経年
+      if (blank("ptax")) {
+        if (hasLand && hasBldg) put("ptax", landEval * (0.014 / 6 + 0.003 / 3) + bldgEval * 0.017,
+          `固定資産税評価額の概算（土地 路線価÷0.8×70%=${fmt(landEval, 0)}万円に住宅用地特例、建物 ${fmt(bldgEval, 0)}万円）×税率1.4%＋0.3%`);
+        else if (fin(p.gpi)) put("ptax", p.gpi * 0.06, "満室年収の6%（一棟住宅の固都税の一般的な水準）");
+      }
+      if (blank("bldg")) {
+        if (hasLand && hasBldg) put("bldg", (bldgEval / (bldgEval + landEval)) * 100, `固定資産税評価額の概算で按分（土地${fmt(landEval, 0)}：建物${fmt(bldgEval, 0)}万円）`, 0);
+        else if (fin(legal) && fin(remain)) put("bldg", Math.max(10, Math.min(60, 10 + 50 * (remain / legal))), `構造と残存耐用年数${remain}/${legal}年からの目安`, 0);
+      }
+      // --- 税率 ---
+      if (blank("taxr")) put("taxr", 33, "課税所得695〜900万円の所得税23%（復興税込で約23.5%）＋住民税10%を想定", 0);
+      // --- 融資条件 ---
+      p = read();
+      if (blank("loan") && fin(p.price)) { put("loan", Math.round(p.price * 0.9 / 10) * 10, "物件価格の90%（自己資金で諸費用＋1割を入れる一般的な組み方）", 0); finSrc = "rough"; }
+      if (blank("rate") && !(+$("loan").value === 0)) { put("rate", 2.0, "地方銀行・信用金庫の一般的な目安"); finSrc = "rough"; }
+      if (blank("term") && !(+$("loan").value === 0)) {
+        if (fin(remain)) put("term", Math.max(10, Math.min(35, remain)), remain >= 10 ? `残存法定耐用年数${remain}年（多くの金融機関の上限）` : `残存耐用年数${remain}年だが、経過年数で10年程度の融資を出す金融機関がある前提`, 0);
+        else put("term", 25, "構造・築年が不明のため一般的な25年", 0);
+        finSrc = "rough";
+      }
+      // --- 大規模修繕 ---
+      p = read();
+      if (blank("repYear") && blank("repAmt") && fin(p.floorArea) && fin(legal) && (isN || fin(p.age))) {
+        const cycle = legal === 22 ? 12 : 15, age = isN ? 0 : p.age;
+        const next = age % cycle === 0 && age > 0 ? 1 : cycle - (age % cycle);
+        put("repYear", next, `${cycle}年周期の外壁・防水改修。築${age}年から逆算`, 0);
+        put("repAmt", p.floorArea * (legal === 22 ? 0.8 : 1.0), `延床${p.floorArea}㎡×${legal === 22 ? "0.8" : "1.0"}万円/㎡`, 0);
+      }
+      // --- 売却時利回り（AIの地域利回りがあれば優先） ---
+      if (estMode._capAI) {
+        const v = estMode._capAI; delete estMode._capAI;
+        const a0 = missing(Object.assign(read(), { cap: 1 })).ok.core ? analyze(Object.assign(read(), { cap: 1 })) : null;
+        const buy = a0 ? (a0.y1.noi / a0.p.price) * 100 : NaN;
+        const val = fin(buy) ? Math.max(v, buy) + 0.3 : v + 0.3;
+        put("cap", val, `AIによる地域の取引利回り${v}%${fin(buy) ? `と購入時NOI利回り${buy.toFixed(2)}%の高い方` : ""}＋0.3%（保有中の経年分）`);
+      }
+      // 推定できない項目
+      p = read();
+      ["price", "struct", "age", "landArea", "rosen", "mkt"].forEach((k) => {
+        if (k === "age" && p.isNew === true) return;
+        if (!fin(p[k]) && !cannot.some((c) => c.includes(LABEL[k]))) cannot.push(LABEL[k]);
+      });
+      if (!rs) cannot.push("レントロール");
+      markEst(); markGeneral();
+      const msg = (done.length ? `推定で${done.length}項目を補完しました（${done.join("・")}）。` : "推定で補完できる項目はありませんでした。")
+        + (cannot.length ? ` 根拠が無く推定できない項目：${cannot.join("、")}。資料で確認してください。` : "");
+      say(msg);
+    } finally {
+      estBusy = false;
+      btns.forEach((b) => (b.disabled = false));
+      render();
+    }
   }
 
   // ---------- AI：総合所見 ----------
@@ -1688,6 +1849,7 @@ JSONオブジェクト1つだけで答える：
       `総合スコア${fin(sc.total) ? sc.total + "点（" + sc.grade + "）" : "なし"}、採点${sc.nScored}/${sc.nItems}項目`,
       "自動チェックの指摘：" + j.al.map((x) => x.t.replace(/<[^>]+>/g, "")).join(" / "),
       lack.length ? `データ不足の分野：${lack.join("／")}` : "",
+      (() => { const e = Object.keys(estMode).filter((k) => estMode[k] && k[0] !== "_"); return e.length ? `推定値の項目：${e.map((k) => k === "isNew" ? `新築／中古（${estMode[k]}）` : `${LABEL[k]}=${$(k).value}（${estMode[k]}）`).join("、")}` : ""; })(),
       (() => { const g = Object.keys(GENERAL).filter((k) => genMode[k]); return g.length ? `一般値（目安）で置いている前提：${g.map((k) => `${LABEL[k]}=${$(k).value}`).join("、")}` : ""; })(),
     ].filter(Boolean).join("\n");
     try {
