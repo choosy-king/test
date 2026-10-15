@@ -318,7 +318,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       <fieldset>
         <legend>運営の前提（あなたの見立て）</legend>
         <div class="f"><label for="vac">空室・滞納損</label><div class="in"><input id="vac" type="number" step="1"><span class="u">%</span></div></div>
-        <div class="f"><label for="decl">家賃下落</label><div class="in"><input id="decl" type="number" step="0.1"><span class="u">%/年</span></div></div>
+        <div class="f"><label for="decl" id="declLabel">家賃下落</label><div class="in"><input id="decl" type="number" step="0.1"><span class="u">%/年</span></div></div>
         <div class="f"><label for="opex">運営経費率</label><div class="in"><input id="opex" type="number" step="1"><span class="u">%</span></div></div>
         <div class="f"><label for="repYear">大規模修繕の時期（任意）</label><div class="in"><input id="repYear" type="number" step="1"><span class="u">年目</span></div></div>
         <div class="f full"><label for="repAmt">大規模修繕の費用（任意）</label><div class="in"><input id="repAmt" type="number" step="10"><span class="u">万円</span></div></div>
@@ -338,9 +338,9 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       <fieldset>
         <legend>出口の前提</legend>
         <div class="f"><label for="hold">保有期間</label><div class="in"><input id="hold" type="number" step="1" min="1" max="35"><span class="u">年</span></div></div>
-        <div class="f"><label for="cap">売却時利回り</label><div class="in"><input id="cap" type="number" step="0.1"><span class="u">%</span></div></div>
+        <div class="f"><label for="cap">売却時の表面利回り</label><div class="in"><input id="cap" type="number" step="0.1"><span class="u">%</span></div></div>
         <div class="f"><label for="sellc">売却費用</label><div class="in"><input id="sellc" type="number" step="0.5"><span class="u">%</span></div></div>
-        <p class="hint">売却時利回りは同エリア・同築年帯の取引事例や売出事例を根拠にしてください。</p>
+        <p class="hint">売却時の表面利回り（満室年収÷売却価格）。同エリア・同築年帯の取引事例や売出事例を根拠にしてください。</p>
       </fieldset>
 
       <fieldset>
@@ -438,7 +438,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
             <div class="pairs" id="exitSum"></div>
             <h3>売却年別のシナリオ</h3>
             <div class="scroll"><table id="exitTable"></table></div>
-            <p class="note">売却価格＝翌年NOI÷売却時利回り。手取り＝売却価格−売却費用−残債−譲渡税。緑の行は入力した売却時利回りでIRRが最も高い売却年。「買主の融資」は売却時点の残存法定耐用年数です。</p>
+            <p class="note">売却価格＝売却翌年の満室想定年収÷売却時の表面利回り。手取り＝売却価格−売却費用−残債−譲渡税。緑の行は入力した売却時利回りでIRRが最も高い売却年。「買主の融資」は売却時点の残存法定耐用年数です。</p>
             <h3>保有し続けた場合との比較</h3>
             <div class="pairs" id="exitHold"></div>
           </div>
@@ -545,7 +545,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     pname: "物件名", addr: "所在地", price: "物件価格", gpi: "満室想定年収", struct: "構造", age: "築年数", landArea: "土地面積", floorArea: "延床面積",
     ptax: "固都税", otherRate: "諸費用率", bldg: "建物価格比率", equip: "設備比率", vac: "空室・滞納損", decl: "家賃下落", opex: "運営経費率",
     repYear: "大規模修繕の時期", repAmt: "大規模修繕の費用", loan: "借入額", rate: "金利", term: "融資期間", taxr: "所得税+住民税率",
-    hold: "保有期間", cap: "売却時利回り", sellc: "売却費用", mkt: "相場賃料単価", rosen: "路線価", repro: "再調達単価", landAdj: "土地評価の補正",
+    hold: "保有期間", cap: "売却時の表面利回り", sellc: "売却費用", mkt: "相場賃料単価", rosen: "路線価", repro: "再調達単価", landAdj: "土地評価の補正",
     bLandBasis: "土地の評価基準", bkLand: "土地の掛目", bkBldg: "建物の掛目", bkInc: "収益評価の掛目", bVac: "査定空室率", bExp: "査定経費率",
     bCap: "還元利回り", bDisc: "DCF割引率", bRate: "審査金利", bDscr: "必要DSCR", bRatio: "返済比率の上限", bMaxTerm: "融資期間の上限",
   };
@@ -568,10 +568,10 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
   const GENERAL = {
     otherRate: { v: 4, note: "登記・取得税・融資手数料等で価格の3〜5%程度" },
     vac: { v: 10, note: "空室・滞納で5〜10%程度を見込む例が多い（保守側の10%）" },
-    decl: { v: 1, note: "家賃は年0.5〜1%程度下落する前提が一般的（保守側の1%）" },
+    decl: { v: 1, note: "年1%下落（新築は10年間0%、11年目から適用）" },
     opex: { v: 15, note: "管理費5%＋修繕・保険・共用費などで実効収入の15%前後（固都税は別）" },
     hold: { v: 10, note: "長期譲渡（6年目以降）となり、融資残高も減る10年が比較の基準" },
-    cap: { v: null, note: "購入時のNOI利回り＋0.5%（築年が進む分、利回りが上がる前提）" },
+    cap: { v: null, note: "購入時の表面利回り＋0.5%（築年が進む分、利回りが上がる前提）" },
     sellc: { v: 4, note: "仲介手数料3%＋6万円＋税と抵当権抹消費用等" },
     repro: { v: null, note: "RC・SRC 20／重量鉄骨 18／軽量鉄骨・木造 15万円/㎡（構造に連動）" },
     bLandBasis: { v: 1, note: "路線価を基準とする金融機関が多い" },
@@ -626,10 +626,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
   function syncGeneral(p) {
     if (genMode.repro) { const v = reproFor(p.struct); $("repro").value = fin(v) ? v : ""; p.repro = v; }
     if (genMode.cap) {
-      const st = missing(Object.assign({}, p, { cap: 1 }));
-      if (st.ok.core) {
-        const a0 = analyze(Object.assign({}, p, { cap: 1 }));
-        const v = Math.round((a0.y1.noi / p.price * 100 + 0.5) * 10) / 10;
+      if (fin(p.price) && fin(p.gpi) && p.price > 0) {
+        const v = Math.round((p.gpi / p.price * 100 + 0.5) * 10) / 10;
         if (fin(v) && v > 0) { $("cap").value = v.toFixed(1); p.cap = v; }
       } else { $("cap").value = ""; p.cap = NaN; }
     }
@@ -638,7 +636,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
   const SAMPLE = {
     pname: "サンプル 〇〇町RCマンション", addr: "大阪府箕面市（サンプル）", isNew: false,
     price: 12000, gpi: 900, struct: 47, age: 22, landArea: 330, floorArea: 600, ptax: 60, otherRate: 4, bldg: 40, equip: 20,
-    vac: 10, decl: 1, opex: 15, repYear: 4, repAmt: 600, loan: 11000, rate: 2.2, term: 25, taxr: 33, hold: 10, cap: 5.5, sellc: 4,
+    vac: 10, decl: 1, opex: 15, repYear: 4, repAmt: 600, loan: 11000, rate: 2.2, term: 25, taxr: 33, hold: 10, cap: 8, sellc: 4,
     mkt: 1900, rosen: 250, repro: 20, landAdj: 1, bLandBasis: 1, bkLand: 80, bkBldg: 70, bkInc: 80, bVac: 20, bExp: 20, bCap: 7, bDisc: 6.5,
     bRate: 4, bDscr: 1.2, bRatio: 50, bMaxTerm: 35,
     roll: Array.from({ length: 15 }, (_, i) => ({ room: `${Math.floor(i / 3) + 1}0${(i % 3) + 1}`, area: 25,
@@ -709,6 +707,11 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     return q;
   }
 
+  // 家賃の推移：新築は10年間据え置き、11年目から下落率を適用。中古は1年目の翌年から適用
+  function rentFactor(p, y) {
+    const free = p.isNew === true ? 10 : 0;
+    return Math.pow(1 - (p.decl || 0) / 100, free ? Math.max(0, y - free) : y - 1);
+  }
   function analyze(p0, over = {}) {
     const src = Object.assign({}, p0, over);
     const st = missing(src);
@@ -744,7 +747,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
         }
         month++;
       }
-      const gpi = p.gpi * Math.pow(1 - p.decl / 100, y - 1);
+      const gpi = p.gpi * rentFactor(p, y);
       const egi = gpi * (1 - p.vac / 100);
       const opex = (egi * p.opex) / 100 + p.ptax;
       const noi = egi - opex;
@@ -782,7 +785,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
   function saleAt(a, h, capPct) {
     const R = a.rows, p = a.p;
-    const price = capPct > 0 ? R[h].noi / (capPct / 100) : NaN;
+    const price = capPct > 0 ? R[h].gpi / (capPct / 100) : NaN; // 売却翌年の満室年収÷表面利回り
     const cost = (price * p.sellc) / 100;
     const book = a.total - R[h - 1].accDep;
     const gain = price - cost - book;
@@ -826,7 +829,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     const bldg = p.floorArea * p.repro * bRatio;
     const total = land + bldg;
     return { ok: a.ok.seki && a.ok.core, land, bldg, total, bRatio, ratio: total / p.price, loanCover: a.loan > 0 ? total / a.loan : Infinity,
-      income: a.ok.exit || (fin(a.src.cap) && a.ok.core) ? a.y1.noi / (p.cap / 100) : NaN };
+      income: a.ok.exit || (fin(a.src.cap) && a.ok.core) ? a.y1.gpi / (p.cap / 100) : NaN };
   }
 
   // ---------- 銀行評価 ----------
@@ -852,10 +855,10 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     const dcfRows = [];
     let pvSum = 0;
     for (let t = 1; t <= N; t++) {
-      const nn = noi * Math.pow(1 - p.decl / 100, t - 1), df = 1 / Math.pow(1 + d, t);
+      const nn = noi * rentFactor(p, t), df = 1 / Math.pow(1 + d, t);
       pvSum += nn * df; dcfRows.push({ t, noi: nn, df, pv: nn * df });
     }
-    const revNoi = noi * Math.pow(1 - p.decl / 100, N);
+    const revNoi = noi * rentFactor(p, N + 1);
     const rev = (revNoi / tcap) * (1 - p.sellc / 100);
     const revPv = rev / Math.pow(1 + d, N);
     const dcf = pvSum + revPv;
@@ -905,8 +908,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     }
     if (ok.exit) {
       if (!a.s.longTerm) add("warn", `<b>保有${a.H}年の売却は短期譲渡（39.63%）。</b>6年目以降なら長期譲渡（20.315%）です。`);
-      const buyNoi = a.y1.noi / p.price;
-      if (p.cap > buyNoi * 100 + 1.5) add("warn", `<b>売却時利回り${p.cap}%が購入時のNOI利回り${pct(buyNoi)}より大幅に高い想定です。</b>売却価格が大きく下がる前提のため、IRRが低く出ます。`);
+      const buyS = p.gpi / p.price;
+      if (p.cap > buyS * 100 + 1.5) add("warn", `<b>売却時の表面利回り${p.cap}%が購入時の表面利回り${pct(buyS)}より大幅に高い想定です。</b>売却価格が大きく下がる前提のため、IRRが低く出ます。`);
       const best = bestExit(a);
       if (best && best.h !== a.H) add("info", `<b>出口：${best.h}年目の売却がIRR最大（${pct(best.irr)}）</b>です。現在の想定は${a.H}年保有（${pct(a.irr)}）。`);
       if (a.s.remain < 10) add("warn", `<b>売却時の残存耐用年数が${a.s.remain}年</b>。買主が長期融資を組みにくく、売りにくくなる可能性があります。`);
@@ -990,7 +993,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
         it("IRR（税引後）", pct(a.irr), lin(a.irr, 0, 0.10), "0%→0点／10%→10点", a.irr < 0.04 ? "リスクに見合うか他の運用先と比較を" : "投資効率は良好", need("exit") || (a.equity <= 0 && "自己資金ゼロ以下のため対象外")),
         it("自己資金倍率", fin(a.multiple) ? a.multiple.toFixed(2) + "倍" : "—", lin(a.multiple, 1, 2.5), "1.0倍→0点／2.5倍→10点", a.multiple < 1 ? "売却しても自己資金を回収できない" : "自己資金が増えて戻る", need("exit") || (a.equity <= 0 && "自己資金ゼロ以下のため対象外")),
         it("売却時の残存耐用年数", `${a.s.remain}年`, lin(a.s.remain, 0, 20), "0年→0点／20年→10点", a.s.remain < 10 ? "買主が長期融資を組みにくく売りにくい" : "買主も融資を組みやすい", !fin(a.src.hold) && "保有期間が未入力"),
-        it("売却時利回りの妥当性", `${p.cap}%（購入時NOI ${pct(buyNoi)}）`, lin(p.cap - buyNoi * 100, 2.5, 0.3), "購入時+2.5%→0点／+0.3%→10点", p.cap < buyNoi * 100 ? "購入時より低い利回りで売れる楽観的な想定" : p.cap - buyNoi * 100 > 1.5 ? "大幅な値下がりを想定" : "保守的な想定", !fin(a.src.cap) && "売却時利回りが未入力"),
+        it("売却時利回りの妥当性", `表面${p.cap}%（購入時 ${pct(a.surface)}）`, lin(p.cap - a.surface * 100, 2.5, 0.3), "購入時+2.5%→0点／+0.3%→10点", p.cap < a.surface * 100 ? "購入時より低い利回りで売れる楽観的な想定" : p.cap - a.surface * 100 > 1.5 ? "大幅な値下がりを想定" : "保守的な想定", !fin(a.src.cap) && "売却時の表面利回りが未入力"),
       ]},
       { key: "book", name: "帳簿・税", weight: 10, items: [
         it("デッドクロスの時期", a.deadCross ? `${a.deadCross}年目` : "なし", a.deadCross ? lin(a.deadCross, 3, 15) : 10, "3年目→0点／15年目→10点", a.deadCross && a.deadCross <= H ? "保有期間中に帳簿と資金が逆転する" : "保有期間中は問題なし", need("tax") || (!hasLoan && "借入なしのため対象外")),
@@ -1130,6 +1133,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     }));
     NUM.forEach((k) => { const box = $(k).closest(".in"); if (box) box.classList.toggle("missing", missIds.has(k)); });
     $("kindSeg").style.outline = p.isNew === null ? "1.5px dashed var(--warn)" : "";
+    $("declLabel").firstChild.nodeValue = p.isNew === true ? "家賃下落（11年目から）" : "家賃下落";
     $("estBar").hidden = GROUPS.every((g) => st.m[g.key].length === 0);
     $("finAskBar").hidden = fin(p.loan) && (p.loan === 0 || (fin(p.rate) && fin(p.term)));
     const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
@@ -1180,7 +1184,9 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
     // CF
     const H = a.H;
-    const R = a.rows.slice(0, fin(p.hold) ? H : 10);
+    const cfYears = a.loan > 0 && fin(p.term) && p.term > 0 ? Math.min(YEARS - 1, Math.ceil(p.term)) : fin(p.hold) ? H : 10;
+    const R = a.rows.slice(0, cfYears);
+    const Rb = a.rows.slice(0, fin(p.hold) ? H : 10);
     const minR = R.reduce((x, y) => ((ok.tax ? y.atcf : y.btcf) < (ok.tax ? x.atcf : x.btcf) ? y : x));
     $("cost").innerHTML = pairs([
       ["物件価格", fmt(a.P, 0)], ["仲介手数料" + (q.isNew ? "（売主物件のため不要）" : ""), fmt(a.brokerage, 1)], ["その他諸費用", fmt(a.other, 1)],
@@ -1209,7 +1215,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     $("ytable").innerHTML = t;
     $("cfNote").textContent = [
       !ok.tax ? `税額・税引後CFは「${a.miss.tax.join("・")}」が未入力のため空欄です（累計CFは税引前）。` : "",
-      !fin(p.hold) ? "保有期間が未入力のため、表は10年分を表示しています。" : "",
+      a.loan > 0 && fin(p.term) ? `融資期間${Math.ceil(p.term)}年（完済まで）を表示しています。` : !fin(p.hold) ? "保有期間が未入力のため、表は10年分を表示しています。" : `借入なしのため保有期間${H}年を表示しています。`,
+      q.isNew ? `新築のため家賃は10年間据え置き、11年目から年${q.decl}%下落で計算しています。` : "",
       !(p.repAmt > 0) ? "大規模修繕は未入力のため計上していません。" : "",
     ].join("");
 
@@ -1218,7 +1225,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     if (ok.exit) {
       const caps = [q.cap - 0.5, q.cap, q.cap + 0.5, q.cap + 1].filter((c) => c > 0);
       const best = bestExit(a);
-      let e = `<tr><th>売却年</th><th>残債</th><th>買主の融資<br>（残存年数）</th><th>税区分</th>${caps.map((c) => `<th>利回り${c.toFixed(1)}%<br>手取り／IRR</th>`).join("")}</tr>`;
+      let e = `<tr><th>売却年</th><th>残債</th><th>買主の融資<br>（残存年数）</th><th>税区分</th>${caps.map((c) => `<th>表面${c.toFixed(1)}%<br>手取り／IRR</th>`).join("")}</tr>`;
       exitYears().forEach((h) => {
         const base = a.sale(h, q.cap);
         e += `<tr class="${best && best.h === h ? "best" : ""} ${h === H ? "hl" : ""}"><td>${h}年目</td>${c1(base.bal, 0)}<td>${base.remain}年</td><td style="font-family:var(--f-body)">${base.longTerm ? "長期" : "短期"}</td>` +
@@ -1230,7 +1237,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
         ["想定売却年", `${H}年目`], ["想定売却価格", fmt(s0.price, 0)], ["売却費用", fmt(s0.cost, 0)],
         ["残債", fmt(s0.bal, 0)], ["簿価（取得費−償却累計）", fmt(s0.book, 0)], ["譲渡益", fmt(s0.gain, 0)],
         [`譲渡税（${s0.longTerm ? "長期20.315%" : "短期39.63%"}）`, fmt(s0.tax, 0)], ["売却手取り", `<b>${fmt(s0.net, 0)}</b>`], ["IRR", pct(s0.irr)],
-        ["IRR最大の売却年", best ? `${best.h}年目（${pct(best.irr)}）` : "—"], ["自己資金を回収できる売却価格の下限", fmt(s0.bal + s0.cost + s0.tax + a.equity - s0.cum, 0)], ["売却時の表面利回り", pct(a.rows[H].gpi / s0.price)],
+        ["IRR最大の売却年", best ? `${best.h}年目（${pct(best.irr)}）` : "—"], ["自己資金を回収できる売却価格の下限", fmt(s0.bal + s0.cost + s0.tax + a.equity - s0.cum, 0)], ["売却時のNOI利回り", pct(a.rows[H].noi / s0.price)],
       ]);
       const hold20 = a.sale(20, q.cap);
       $("exitHold").innerHTML = pairs([
@@ -1244,19 +1251,19 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     if (ok.tax) {
       const hasCap = fin(p.cap);
       let bkh = `<tr><th>年</th><th>収入</th><th>経費</th><th>支払利息</th><th>減価償却</th><th>不動産所得</th><th>税額</th><th>元金返済</th><th>税引後CF</th><th>簿価 建物</th><th>簿価 土地</th><th>残債</th><th>想定時価</th><th>純資産（時価）</th></tr>`;
-      R.forEach((r) => {
+      Rb.forEach((r) => {
         const mv = hasCap ? a.sale(r.y, q.cap).price : NaN;
         const flag = r.taxable > 0 && r.atcf < 0;
         bkh += `<tr class="${flag ? "hl" : ""}"><td>${r.y}年目</td>${c1(r.egi)}${c1(r.opex + r.repair)}${c1(r.interest)}${c1(r.dep)}${c1(r.taxable)}${c1(r.tax)}${c1(r.principal)}${c1(r.atcf)}${c1(r.bookB, 0)}${c1(r.bookL, 0)}${c1(r.bal, 0)}${c1(mv, 0)}${c1(mv - r.bal, 0)}</tr>`;
       });
       $("bookTable").innerHTML = bkh;
-      const lossYears = R.filter((r) => r.taxable < 0);
+      const lossYears = Rb.filter((r) => r.taxable < 0);
       const lossSum = lossYears.reduce((s2, r) => s2 + r.taxable, 0);
       $("bookSum").innerHTML = pairs([
         ["取得価額（諸費用込）", fmt(a.total, 0)], ["土地", fmt(a.landBasis, 0)], ["建物（躯体）", fmt(a.bldgBasis - a.equipBasis, 0)],
         ["建物（設備）", fin(p.equip) ? fmt(a.equipBasis, 0) : "区分なし"], ["躯体の償却", `${a.lifeS}年／年${fmt(a.depS, 1)}`], ["設備の償却", fin(p.equip) ? `${a.lifeE}年／年${fmt(a.depE, 1)}` : "—"],
         ["初年度 不動産所得", fmt(a.y1.taxable, 1)], ["赤字の年数と合計", lossYears.length ? `${lossYears.length}年／${fmt(lossSum, 0)}` : "なし"], ["損益通算の節税額（概算）", fmt((-lossSum * q.taxr) / 100, 0)],
-        ["デッドクロス", a.deadCross ? `${a.deadCross}年目` : "なし"], [`${R.length}年目末の残債`, fmt(R[R.length - 1].bal, 0)], [`${R.length}年目末の純資産（時価）`, hasCap ? fmt(a.sale(R.length, q.cap).price - R[R.length - 1].bal, 0) : NA],
+        ["デッドクロス", a.deadCross ? `${a.deadCross}年目` : "なし"], [`${Rb.length}年目末の残債`, fmt(Rb[Rb.length - 1].bal, 0)], [`${Rb.length}年目末の純資産（時価）`, hasCap ? fmt(a.sale(Rb.length, q.cap).price - Rb[Rb.length - 1].bal, 0) : NA],
       ]);
     }
 
@@ -1272,7 +1279,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       $("sekiSum").innerHTML = pairs([
         ["土地評価", `${fmt(sk.land, 0)}万円`], ["建物評価", `${fmt(sk.bldg, 0)}万円`], ["積算価格", `<b>${fmt(sk.total, 0)}万円</b>`],
         ["価格に対する積算比率", pct(sk.ratio, 0)], ["借入額に対する積算", a.loan > 0 ? pct(sk.loanCover, 0) : "借入なし"], ["積算と借入の差（担保余力）", fmt(sk.total - a.loan, 0) + "万円"],
-        ["建物の残存割合", `${a.remainLegal}／${a.legal}年（${pct(sk.bRatio, 0)}）`], ["公示価格水準の土地（路線価÷0.8）", `${fmt(sk.land / 0.8, 0)}万円`], ["収益価格（NOI÷売却時利回り）", fin(sk.income) ? `${fmt(sk.income, 0)}万円` : "売却時利回りが未入力"],
+        ["建物の残存割合", `${a.remainLegal}／${a.legal}年（${pct(sk.bRatio, 0)}）`], ["公示価格水準の土地（路線価÷0.8）", `${fmt(sk.land / 0.8, 0)}万円`], ["収益価格（満室年収÷売却時の表面利回り）", fin(sk.income) ? `${fmt(sk.income, 0)}万円` : "売却時の表面利回りが未入力"],
         ["土地評価の割合", pct(sk.land / sk.total, 0)],
       ]);
     }
@@ -1727,16 +1734,17 @@ JSONオブジェクト1つだけで答える：
 構造：${fin(p.struct) ? $("struct").selectedOptions[0].text : "不明"}／築年数：${fin(p.age) ? p.age + "年" : p.isNew ? "新築" : "不明"}／主な専有面積：${areas}
 {"rosen_sen_per_m2": {"value": 相続税路線価の概算(千円/㎡、前面道路の住宅地の水準), "basis": "根拠40字以内"},
  "market_rent_yen_per_m2": {"value": この立地・構造・築年・広さの共益費込み月額賃料単価(円/㎡), "basis": "根拠40字以内"},
- "cap_rate_pct": {"value": この地域・築年帯の一棟収益物件の取引利回り(表面ではなくNOIベース、%), "basis": "根拠40字以内"}}
+ "cap_rate_pct": {"value": この地域・築年帯の一棟収益物件の取引利回り(NOIベース、%), "basis": "根拠40字以内"},
+ "surface_yield_pct": {"value": この地域・築年帯の一棟収益物件の売買時の表面利回り(%), "basis": "根拠40字以内"}}
 所在地が市区町村まで特定できない、または見当がつかない項目は value を null にしてください。`, { modelTier: "default" });
           const g = (o) => (o && typeof o === "object" ? o : { value: o });
-          const ro = g(r.rosen_sen_per_m2), mk = g(r.market_rent_yen_per_m2), cp = g(r.cap_rate_pct);
+          const ro = g(r.rosen_sen_per_m2), mk = g(r.market_rent_yen_per_m2), cp = g(r.cap_rate_pct), sy = g(r.surface_yield_pct);
           if (+ro.value > 0) put("rosen", +ro.value, `AIによる概算（${ro.basis || "所在地の水準"}）。国税庁の路線価図で確認してください`, 0);
           if (+mk.value > 0) put("mkt", +mk.value, `AIによる概算（${mk.basis || "周辺の相場水準"}）。近隣の募集事例で確認してください`, 0);
           if (+cp.value > 0 && +cp.value < 20) {
             if (genMode.bCap) { genMode.bCap = false; $("bCap").value = ""; put("bCap", +cp.value + 0.5, `AIによる地域の取引利回り${cp.value}%＋0.5%（金融機関は市場より保守的に見る）`); }
-            if (genMode.cap) { genMode.cap = false; $("cap").value = ""; estMode._capAI = +cp.value; }
           }
+          if (+sy.value > 0 && +sy.value < 25 && genMode.cap) { genMode.cap = false; $("cap").value = ""; estMode._capAI = +sy.value; }
         } catch (e) {
           if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) sampleFn = null;
           cannot.push("AIによる地域相場（" + (e && e.code === "rate_limited" ? "利用上限" : "取得できませんでした") + "）");
@@ -1804,10 +1812,10 @@ JSONオブジェクト1つだけで答える：
       // --- 売却時利回り（AIの地域利回りがあれば優先） ---
       if (estMode._capAI) {
         const v = estMode._capAI; delete estMode._capAI;
-        const a0 = missing(Object.assign(read(), { cap: 1 })).ok.core ? analyze(Object.assign(read(), { cap: 1 })) : null;
-        const buy = a0 ? (a0.y1.noi / a0.p.price) * 100 : NaN;
+        const q0 = read();
+        const buy = fin(q0.gpi) && q0.price > 0 ? (q0.gpi / q0.price) * 100 : NaN;
         const val = fin(buy) ? Math.max(v, buy) + 0.3 : v + 0.3;
-        put("cap", val, `AIによる地域の取引利回り${v}%${fin(buy) ? `と購入時NOI利回り${buy.toFixed(2)}%の高い方` : ""}＋0.3%（保有中の経年分）`);
+        put("cap", val, `AIによる地域の売買時の表面利回り${v}%${fin(buy) ? `と購入時の表面利回り${buy.toFixed(2)}%の高い方` : ""}＋0.3%（保有中の経年分）`);
       }
       // 推定できない項目
       p = read();
