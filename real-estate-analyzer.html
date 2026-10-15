@@ -77,6 +77,36 @@ h3 { font-size: .9rem; margin: 18px 0 8px; color: var(--ink-2); }
 .drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; cursor: pointer; min-height: 132px; color: var(--ink-2); background: var(--bg); }
 .drop.over { border-color: var(--accent); background: var(--accent-soft); }
 .drop strong { color: var(--ink); }
+.drop .pick { font-size: .95rem; padding: 10px 22px; }
+.vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.flist { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.flist li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px 4px 10px; font-size: .8rem; text-align: left; min-width: 0; }
+.flist li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.flist li small { color: var(--ink-3); white-space: nowrap; }
+/* スコア */
+.score-top { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: center; }
+@media (max-width: 640px) { .score-top { grid-template-columns: minmax(0, 1fr); } }
+.score-big { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.score-big svg { width: 150px; height: 150px; display: block; }
+.score-big .num { font: 500 2.6rem var(--f-num); fill: var(--ink); }
+.score-big .of { font: .8rem var(--f-num); fill: var(--ink-3); }
+.grade { font-family: var(--f-display); font-size: 1.05rem; font-weight: 700; padding: 2px 14px; border-radius: 999px; }
+.g-a { background: var(--ok-soft); color: var(--ok); }
+.g-b { background: var(--accent-soft); color: var(--accent); }
+.g-c { background: var(--warn-soft); color: var(--warn); }
+.g-d { background: var(--neg-soft); color: var(--neg); }
+.cat-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 4.2em 3.2em; gap: 10px; align-items: center; font-size: .86rem; }
+.cat-row .w { font-size: .72rem; color: var(--ink-3); text-align: right; }
+.cat-row .pt { font-family: var(--f-num); text-align: right; font-variant-numeric: tabular-nums; }
+.cats { display: flex; flex-direction: column; gap: 9px; }
+table.items td:nth-child(5) { white-space: normal; text-align: left; font-family: var(--f-body); color: var(--ink-2); min-width: 16em; }
+table.items tr.cat-h td { background: var(--bg); font-family: var(--f-body); font-weight: 700; color: var(--ink); }
+.dots { display: inline-flex; gap: 2px; vertical-align: middle; }
+.dots i { width: 6px; height: 10px; border-radius: 1px; background: var(--line); display: block; }
+.dots i.on { background: var(--accent); }
+.dots.low i.on { background: var(--neg); }
+.dots.mid i.on { background: var(--warn); }
 .drop small { color: var(--ink-3); font-size: .74rem; }
 textarea { width: 100%; min-height: 132px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: .85rem/1.5 var(--f-body); padding: 10px; }
 .ingest-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
@@ -161,13 +191,14 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
   </header>
 
   <section class="card" aria-labelledby="h-in">
-    <h2 id="h-in">物件資料の読み込み <small>マイソク・物件概要書・レントロール（PDF・画像・テキスト）</small></h2>
+    <h2 id="h-in">物件資料の読み込み <small>マイソク・物件概要書・レントロール（PDF・画像・Excel・テキスト）</small></h2>
     <div class="ingest">
-      <div class="drop" id="drop" tabindex="0" role="button" aria-label="ファイルを選ぶ">
-        <strong>ファイルをドロップ、またはクリックして選択</strong>
-        <span>PDF・JPG・PNG・テキスト・CSV</span>
-        <small>複数ファイル可。スキャンPDFは画像として読み取ります</small>
-        <input type="file" id="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.tsv,text/plain,application/pdf,image/*" hidden>
+      <div class="drop" id="drop">
+        <label for="file" class="btn pick">ファイルを選択</label>
+        <input type="file" id="file" class="vh" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.csv,.tsv,.xlsx,.xls,text/plain,text/csv,application/pdf,image/*,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        <span>またはここにドラッグ＆ドロップ</span>
+        <small>PDF・画像（JPG/PNG）・Excel・CSV・テキスト。複数可。選ぶとすぐ読み取りを始めます</small>
+        <ul class="flist" id="flist"></ul>
       </div>
       <div class="f">
         <label for="paste">または概要をテキストで貼り付け</label>
@@ -269,6 +300,17 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
         <div class="memo" id="memo"></div>
       </section>
 
+      <section class="card" aria-labelledby="h-sc">
+        <h2 id="h-sc">総合スコア <small>7分野・25項目を10点満点で採点し、分野の重みで100点に換算</small></h2>
+        <div class="score-top">
+          <div class="score-big" id="scoreBig"></div>
+          <div class="cats" id="cats"></div>
+        </div>
+        <h3>項目別の評価</h3>
+        <div class="scroll"><table class="items" id="items"></table></div>
+        <p class="note">評価：◎ 8点以上／○ 6点以上／△ 4点以上／× 4点未満。データが無い項目（レントロール未入力など）は採点から外し、その分野の重みを他の分野に配分します。基準は個人の一棟投資を想定した目安です。</p>
+      </section>
+
       <div class="kpis" id="kpis"></div>
 
       <section class="card">
@@ -348,6 +390,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -611,6 +654,100 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
   const pairs = (list) => list.map(([l, v]) => `<div><span>${l}</span><span>${v}</span></div>`).join("");
   const c1 = (v, d = 1) => `<td class="${v < 0 ? "neg" : ""}">${fmt(v, d)}</td>`;
 
+  // ---------- スコア ----------
+  // lin(v, 0点の値, 10点の値)：その間を直線で採点（逆向きも可）
+  const lin = (v, bad, good) => (isFinite(v) ? Math.max(0, Math.min(10, ((v - bad) / (good - bad)) * 10)) : NaN);
+  function scoreAll(a, rs, sk) {
+    const p = a.p, H = a.H;
+    const up2 = analyze(p, { rate: p.rate + 2 });
+    const minRow = a.rows.slice(0, H).reduce((x, y) => (y.atcf < x.atcf ? y : x));
+    const buyNoi = a.y1.noi / p.price;
+    const underYears = a.rows.slice(0, H).filter((r) => a.sale(r.y, p.cap).price < r.bal).length;
+    const lossFree = a.rows.slice(0, H).filter((r) => r.taxable > 0 && r.atcf < 0).length;
+    const hasRoll = !!rs, hasMkt = hasRoll && p.mkt > 0, hasSeki = p.landArea > 0 && p.rosen > 0 && p.floorArea > 0;
+    const it = (name, val, pts, crit, comment, na) => ({ name, val, pts: na ? NaN : Math.round(pts * 10) / 10, crit, comment, na: !!na || !isFinite(pts) });
+    const cats = [
+      { key: "yield", name: "収益性", weight: 20, items: [
+        it("表面利回り", pct(a.surface), lin(a.surface, 0.05, 0.10), "5%→0点／10%→10点", a.surface >= 0.08 ? "高水準。家賃設定が実態に合っているか要確認" : a.surface < 0.06 ? "低く、経費と返済で利益が残りにくい" : "標準的"),
+        it("実質利回り（FCR）", pct(a.fcr), lin(a.fcr, 0.035, 0.07), "3.5%→0点／7%→10点", a.fcr < 0.045 ? "経費控除後の収益力が弱い" : "経費を引いても収益が残る"),
+        it("自己資金利回り（CCR）", pct(a.ccr), lin(a.ccr, 0, 0.10), "0%→0点／10%→10点", a.equity <= 0 ? "自己資金ゼロのため算出不可" : a.ccr < 0.03 ? "投じた自己資金に対して手残りが少ない" : "自己資金の効率は良好", a.equity <= 0),
+        it("イールドギャップ（FCR−K）", pct(a.fcr - a.k), lin(a.fcr - a.k, -0.01, 0.025), "−1%→0点／+2.5%→10点", a.fcr < a.k ? "逆レバレッジ。借入が収益を圧迫" : "借入が自己資金利回りを押し上げている", a.loan <= 0),
+      ]},
+      { key: "safe", name: "安全性", weight: 20, items: [
+        it("DSCR", isFinite(a.dscr) ? a.dscr.toFixed(2) : "—", lin(a.dscr, 1.0, 1.5), "1.0→0点／1.5→10点", a.dscr < 1.3 ? "返済余力が薄い。金融機関の目安1.3未満" : "返済余力は十分", a.loan <= 0),
+        it("損益分岐入居率", pct(a.ber, 1), lin(a.ber, 0.9, 0.6), "90%→0点／60%→10点", a.ber > 0.8 ? "少しの空室で持ち出しになる" : "空室への耐性あり"),
+        it("金利+2%時のDSCR", isFinite(up2.dscr) ? up2.dscr.toFixed(2) : "—", lin(up2.dscr, 0.9, 1.3), "0.9→0点／1.3→10点", up2.dscr < 1 ? "金利上昇で返済が家賃を上回る" : "金利上昇に耐えられる", a.loan <= 0),
+        it("融資期間と残存耐用年数", `${p.term}年／${a.remainLegal}年`, p.isNew || p.term <= a.remainLegal ? 10 : lin(p.term - a.remainLegal, 10, 0), "残存以内→10点／10年超過→0点", p.term > a.remainLegal ? "残存年数を超える融資は通りにくい" : "金融機関の基準内", a.loan <= 0),
+      ]},
+      { key: "cf", name: "CF", weight: 15, items: [
+        it("初年度 税引後CF率", pct(a.y1.atcf / p.gpi, 1), lin(a.y1.atcf / p.gpi, 0, 0.25), "満室年収比 0%→0点／25%→10点", a.y1.atcf < 0 ? "初年度から持ち出し" : "初年度の手残り"),
+        it("最も苦しい年のCF", `${minRow.y}年目 ${fmt(minRow.atcf, 0)}万`, lin(minRow.atcf / p.gpi, -0.05, 0.15), "満室年収比 −5%→0点／15%→10点", minRow.atcf < 0 ? `${minRow.y}年目に資金が流出。予備資金が必要` : "保有中に赤字の年なし"),
+        it(`${H}年累計CF÷自己資金`, a.equity > 0 ? pct(a.rows[H - 1].cum / a.equity, 0) : "—", lin(a.rows[H - 1].cum / a.equity, 0, 1), "0%→0点／100%→10点", a.rows[H - 1].cum >= a.equity ? "保有中のCFだけで自己資金を回収" : "自己資金の回収は売却頼み", a.equity <= 0),
+      ]},
+      { key: "exit", name: "出口", weight: 15, items: [
+        it("IRR（税引後）", pct(a.irr), lin(a.irr, 0, 0.10), "0%→0点／10%→10点", a.irr < 0.04 ? "リスクに見合うか他の運用先と比較を" : "投資効率は良好", a.equity <= 0),
+        it("自己資金倍率", isFinite(a.multiple) ? a.multiple.toFixed(2) + "倍" : "—", lin(a.multiple, 1, 2.5), "1.0倍→0点／2.5倍→10点", a.multiple < 1 ? "売却しても自己資金を回収できない" : "自己資金が増えて戻る", a.equity <= 0),
+        it("売却時の残存耐用年数", `${a.s.remain}年`, lin(a.s.remain, 0, 20), "0年→0点／20年→10点", a.s.remain < 10 ? "買主が長期融資を組みにくく売りにくい" : "買主も融資を組みやすい"),
+        it("売却時利回りの妥当性", `${p.cap}%（購入時NOI ${pct(buyNoi)}）`, lin(p.cap - buyNoi * 100, 2.5, 0.3), "購入時+2.5%→0点／+0.3%→10点", p.cap < buyNoi * 100 ? "購入時より低い利回りで売れる楽観的な想定" : p.cap - buyNoi * 100 > 1.5 ? "大幅な値下がりを想定" : "保守的な想定"),
+      ]},
+      { key: "book", name: "帳簿・税", weight: 10, items: [
+        it("デッドクロスの時期", a.deadCross ? `${a.deadCross}年目` : "なし", a.deadCross ? lin(a.deadCross, 3, 15) : 10, "3年目→0点／15年目→10点", a.deadCross && a.deadCross <= H ? "保有期間中に帳簿と資金が逆転する" : "保有期間中は問題なし", a.loan <= 0),
+        it("債務超過の年数", `${underYears}年／${H}年`, lin(underYears / H, 1, 0), "全期間→0点／なし→10点", underYears ? "この期間は売却しても借入を返しきれない" : "保有中いつでも売却で完済できる"),
+        it("黒字なのに資金が減る年", `${lossFree}年`, lin(lossFree / H, 0.5, 0), "保有期間の半分→0点／なし→10点", lossFree ? "税負担で手元資金が減る年がある" : "税負担による資金流出なし"),
+      ]},
+      { key: "rent", name: "賃料", weight: 10, items: [
+        it("平均賃料と相場の差", hasMkt ? `${rs.unitAvg / p.mkt - 1 > 0 ? "+" : ""}${pct(rs.unitAvg / p.mkt - 1, 1)}` : "—", hasMkt ? lin(rs.unitAvg / p.mkt - 1, 0.15, -0.02) : NaN, "+15%→0点／−2%以下→10点", hasMkt && rs.unitAvg > p.mkt * 1.05 ? "相場より高く、入替時に下がる可能性" : "相場並み以下で下落リスクは小さい", !hasMkt),
+        it("相場より高い部屋の割合", hasMkt ? pct(rs.over.length / rs.n, 0) : "—", hasMkt ? lin(rs.over.length / rs.n, 0.5, 0) : NaN, "50%→0点／0%→10点", hasMkt && rs.over.length ? `${rs.over.length}室が退去時に減額の見込み` : "減額リスクの高い部屋なし", !hasMkt),
+        it("現況の入居率", hasRoll ? pct(rs.occRate, 0) : "—", hasRoll ? lin(rs.occRate, 0.7, 0.95) : NaN, "70%→0点／95%→10点", hasRoll && rs.occRate < 0.85 ? "空室が多い。原因（賃料・設備・立地）を確認" : "入居は安定", !hasRoll),
+      ]},
+      { key: "seki", name: "積算", weight: 10, items: [
+        it("積算価格÷物件価格", hasSeki ? pct(sk.ratio, 0) : "—", hasSeki ? lin(sk.ratio, 0.5, 1.0) : NaN, "50%→0点／100%→10点", hasSeki && sk.ratio < 0.7 ? "担保評価が出にくく自己資金が多く要る" : "担保評価は出やすい", !hasSeki),
+        it("積算価格÷借入額", hasSeki && a.loan > 0 ? pct(sk.loanCover, 0) : "—", hasSeki ? lin(sk.loanCover, 0.6, 1.1) : NaN, "60%→0点／110%→10点", hasSeki && sk.loanCover < 1 ? "借入額が担保評価を上回る" : "担保で借入をカバー", !hasSeki || a.loan <= 0),
+        it("収益価格÷物件価格", pct(sk.income / p.price, 0), lin(sk.income / p.price, 0.8, 1.1), "80%→0点／110%→10点", sk.income < p.price * 0.95 ? "収益から見ると割高" : "収益に見合う価格"),
+        it("土地評価の割合", hasSeki ? pct(sk.land / sk.total, 0) : "—", hasSeki ? lin(sk.land / sk.total, 0.2, 0.6) : NaN, "20%→0点／60%→10点", hasSeki && sk.land / sk.total < 0.35 ? "価値の多くが目減りする建物" : "土地が価値を下支え", !hasSeki),
+      ]},
+    ];
+    let wsum = 0, acc = 0;
+    cats.forEach((c) => {
+      const ok = c.items.filter((x) => !x.na);
+      c.na = ok.length === 0;
+      c.score = c.na ? NaN : Math.round((ok.reduce((s, x) => s + x.pts, 0) / ok.length) * 10);
+      if (!c.na) { wsum += c.weight; acc += c.score * c.weight; }
+    });
+    const total = wsum ? Math.round(acc / wsum) : 0;
+    const grade = total >= 80 ? "A" : total >= 65 ? "B" : total >= 50 ? "C" : total >= 35 ? "D" : "E";
+    const gradeText = { A: "優良", B: "良好", C: "普通", D: "要改善", E: "見送り推奨" }[grade];
+    return { total, grade, gradeText, cats };
+  }
+  const mark = (pts) => (pts >= 8 ? ["◎", "ok"] : pts >= 6 ? ["○", "info"] : pts >= 4 ? ["△", "warn"] : ["×", "bad"]);
+  const gcls = (g) => ({ A: "g-a", B: "g-b", C: "g-c", D: "g-d", E: "g-d" }[g]);
+  function renderScore(sc) {
+    const R = 62, C = 2 * Math.PI * R, f = sc.total / 100;
+    const col = sc.total >= 65 ? "var(--ok)" : sc.total >= 50 ? "var(--accent)" : sc.total >= 35 ? "var(--warn)" : "var(--neg)";
+    $("scoreBig").innerHTML = `<svg viewBox="0 0 150 150" role="img" aria-label="総合スコア ${sc.total}点">
+      <circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--line)" stroke-width="10"/>
+      <circle cx="75" cy="75" r="${R}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C * f} ${C}" transform="rotate(-90 75 75)"/>
+      <text x="75" y="84" text-anchor="middle" class="num">${sc.total}</text><text x="75" y="104" text-anchor="middle" class="of">/ 100</text></svg>
+      <span class="grade ${gcls(sc.grade)}">${sc.grade}　${sc.gradeText}</span>`;
+    $("cats").innerHTML = sc.cats.map((c) => {
+      const v = c.na ? 0 : c.score;
+      const bc = c.na ? "var(--line)" : v >= 65 ? "var(--ok)" : v >= 50 ? "var(--accent)" : v >= 35 ? "var(--warn)" : "var(--neg)";
+      return `<div class="cat-row"><span>${c.name}</span><div class="bar-track"><div class="bar-fill" style="width:${v}%;background:${bc}"></div></div><span class="pt">${c.na ? "対象外" : v + "点"}</span><span class="w">重み${c.weight}</span></div>`;
+    }).join("");
+    let h = `<tr><th>項目</th><th>評価</th><th>値</th><th>点数</th><th>コメント</th><th>採点基準</th></tr>`;
+    sc.cats.forEach((c) => {
+      h += `<tr class="cat-h"><td colspan="6">${c.name}　${c.na ? "対象外（データ未入力）" : c.score + "点"}</td></tr>`;
+      c.items.forEach((x) => {
+        if (x.na) { h += `<tr><td style="font-family:var(--f-body)">${x.name}</td><td><span class="chip info">—</span></td><td>${esc(x.val)}</td><td>対象外</td><td>データが無いため採点していません</td><td style="font-family:var(--f-body);color:var(--ink-3)">${x.crit}</td></tr>`; return; }
+        const [m, lv] = mark(x.pts);
+        const on = Math.round(x.pts);
+        const dots = `<span class="dots ${x.pts < 4 ? "low" : x.pts < 6 ? "mid" : ""}" aria-hidden="true">${Array.from({ length: 10 }, (_, i) => `<i class="${i < on ? "on" : ""}"></i>`).join("")}</span>`;
+        h += `<tr><td style="font-family:var(--f-body)">${x.name}</td><td><span class="chip ${lv}">${m}</span></td><td>${esc(x.val)}</td><td>${dots} ${x.pts.toFixed(1)}</td><td>${esc(x.comment)}</td><td style="font-family:var(--f-body);color:var(--ink-3)">${x.crit}</td></tr>`;
+      });
+    });
+    $("items").innerHTML = h;
+  }
+
   let current = null;
   function render() {
     const p = read();
@@ -720,6 +857,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
       ["土地の坪単価（価格ベース）", p.landArea > 0 ? `${fmt((a.landBasis / (p.landArea / 3.30578)), 1)}万円/坪` : "—"], ["建物の評価が残る年数", `${a.remainLegal}年`], ["土地評価の割合", pct(sk.land / sk.total, 0)],
     ]);
 
+    renderScore(scoreAll(a, rs, sk));
     renderCompare();
     $("memoBar").hidden = !sampleFn;
   }
@@ -754,11 +892,11 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
     const list = loadSaved();
     $("cmpEmpty").hidden = list.length > 0;
     if (!list.length) { $("cmp").innerHTML = ""; return; }
-    let h = `<tr><th>物件</th><th>価格</th><th>表面</th><th>FCR</th><th>CCR</th><th>DSCR</th><th>IRR</th><th>積算比率</th><th>初年度税引後CF</th><th>判定</th><th></th></tr>`;
+    let h = `<tr><th>物件</th><th>価格</th><th>表面</th><th>FCR</th><th>CCR</th><th>DSCR</th><th>IRR</th><th>積算比率</th><th>初年度税引後CF</th><th>スコア</th><th>判定</th><th></th></tr>`;
     list.forEach((it, i) => {
       const p = Object.assign({ roll: [] }, it.p);
       const a = analyze(p), sk = sekisan(p, a), j = judge(a, rentStats(p), sk);
-      h += `<tr><td style="font-family:var(--f-body)">${esc(it.name)}</td><td>${fmt(a.P, 0)}</td><td>${pct(a.surface)}</td><td>${pct(a.fcr)}</td><td>${pct(a.ccr)}</td><td>${isFinite(a.dscr) ? a.dscr.toFixed(2) : "—"}</td><td>${pct(a.irr)}</td><td>${p.landArea > 0 ? pct(sk.ratio, 0) : "—"}</td>${c1(a.y1.atcf)}<td><span class="chip ${j.verdict[0]}">${j.verdict[1]}</span></td><td><button class="btn ghost sm" data-load="${i}" type="button">読込</button> <button class="btn ghost sm" data-del="${i}" type="button">削除</button></td></tr>`;
+      h += `<tr><td style="font-family:var(--f-body)">${esc(it.name)}</td><td>${fmt(a.P, 0)}</td><td>${pct(a.surface)}</td><td>${pct(a.fcr)}</td><td>${pct(a.ccr)}</td><td>${isFinite(a.dscr) ? a.dscr.toFixed(2) : "—"}</td><td>${pct(a.irr)}</td><td>${p.landArea > 0 ? pct(sk.ratio, 0) : "—"}</td>${c1(a.y1.atcf)}<td>${(() => { const sc = scoreAll(a, rentStats(p), sk); return `${sc.total}点 ${sc.grade}`; })()}</td><td><span class="chip ${j.verdict[0]}">${j.verdict[1]}</span></td><td><button class="btn ghost sm" data-load="${i}" type="button">読込</button> <button class="btn ghost sm" data-del="${i}" type="button">削除</button></td></tr>`;
     });
     $("cmp").innerHTML = h;
   }
@@ -845,17 +983,25 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
   let extNotes = [];
   let sampleFn = null, imgLimits = null, ctl = null;
   const drop = $("drop"), fileIn = $("file");
-  drop.addEventListener("click", () => fileIn.click());
-  drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); } });
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
   drop.addEventListener("dragleave", () => drop.classList.remove("over"));
   drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); setFiles(e.dataTransfer.files); });
   fileIn.addEventListener("change", () => setFiles(fileIn.files));
   function setFiles(list) {
-    files = Array.from(list || []);
-    drop.querySelector("strong").textContent = files.length ? files.map((f) => f.name).join("、") : "ファイルをドロップ、またはクリックして選択";
-    status(files.length ? `${files.length}件のファイルを選択しました。「読み取って分析」を押してください。` : "");
+    const add = Array.from(list || []);
+    add.forEach((f) => { if (!files.some((x) => x.name === f.name && x.size === f.size)) files.push(f); });
+    fileIn.value = "";
+    renderFiles();
+    if (add.length) extract().catch((e) => status(errText(e), true));
   }
+  function renderFiles() {
+    const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB");
+    $("flist").innerHTML = files.map((f, i) => `<li><span>${esc(f.name)}</span><small>${kb(f.size)}</small><button class="btn ghost sm" type="button" data-rm="${i}">外す</button></li>`).join("");
+  }
+  $("flist").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rm]");
+    if (b) { files.splice(+b.dataset.rm, 1); renderFiles(); status(files.length ? `${files.length}件のファイルがあります。「読み取って分析」で再読み取りできます。` : "ファイルを選ぶか、テキストを貼り付けてください。"); }
+  });
   function status(t, err) { const s = $("readStatus"); s.textContent = t; s.classList.toggle("err", !!err); }
 
   async function pdfToContent(file) {
@@ -896,6 +1042,10 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
         images.push(...r.images);
       } else if (f.type.startsWith("image/")) {
         images.push(f);
+      } else if (/\.xlsx?$/.test(name)) {
+        if (!window.XLSX) throw new Error("Excel読み込み機能を読み込めませんでした");
+        const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type: "array" });
+        text += `\n\n【${f.name}】\n` + wb.SheetNames.slice(0, 5).map((n) => `＜${n}＞\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join("\n");
       } else {
         text += `\n\n【${f.name}】\n` + (await f.text());
       }
@@ -1061,6 +1211,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
       `デッドクロス${a.deadCross || "なし"}年目、償却 躯体${a.lifeS}年・設備${a.lifeE}年`,
       rs ? `レントロール${rs.n}戸・入居率${pct(rs.occRate, 0)}・平均${fmt(rs.unitAvg)}円/㎡、相場${p.mkt}円/㎡、相場超${rs.over.length}室` : "レントロールなし",
       p.landArea > 0 ? `積算${fmt(sk.total)}万円（価格比${pct(sk.ratio, 0)}）、収益価格${fmt(sk.income)}万円` : "積算データなし",
+      (() => { const sc = scoreAll(a, rs, sk); return `総合スコア${sc.total}点（${sc.grade}）／` + sc.cats.map((c) => `${c.name}${c.na ? "対象外" : c.score + "点"}`).join("・") + "。低評価項目：" + sc.cats.flatMap((c) => c.items.filter((x) => !x.na && x.pts < 4).map((x) => `${x.name}(${x.val})`)).join("、"); })(),
       "自動チェックの指摘：" + j.al.map((x) => x.t.replace(/<[^>]+>/g, "")).join(" / "),
     ].join("\n");
     try {
