@@ -102,6 +102,20 @@ h3 { font-size: .9rem; margin: 18px 0 8px; color: var(--ink-2); }
 .cats { display: flex; flex-direction: column; gap: 9px; }
 table.items td:nth-child(5) { white-space: normal; text-align: left; font-family: var(--f-body); color: var(--ink-2); min-width: 16em; }
 table.items tr.cat-h td { background: var(--bg); font-family: var(--f-body); font-weight: 700; color: var(--ink); }
+.bank-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; padding: 12px; background: var(--bg); border-radius: 8px; }
+@media (max-width: 760px) { .bank-in { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bank-in .in { background: var(--panel); }
+.bank-in .lg { margin: 0; }
+.loan-box { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+@media (max-width: 640px) { .loan-box { grid-template-columns: minmax(0, 1fr); } }
+.loan-box > div { background: var(--panel); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.loan-box .k { font-size: .76rem; color: var(--ink-2); }
+.loan-box .v { font: 500 1.3rem var(--f-num); font-variant-numeric: tabular-nums; }
+.loan-box .d { font-size: .74rem; color: var(--ink-3); }
+.loan-box .v.neg { color: var(--neg); }
+.loan-box .v.pos { color: var(--ok); }
+tr.min td { background: var(--warn-soft); }
+tr.sum td { font-weight: 700; }
 .dots { display: inline-flex; gap: 2px; vertical-align: middle; }
 .dots i { width: 6px; height: 10px; border-radius: 1px; background: var(--line); display: block; }
 .dots i.on { background: var(--accent); }
@@ -301,7 +315,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
       </section>
 
       <section class="card" aria-labelledby="h-sc">
-        <h2 id="h-sc">総合スコア <small>7分野・25項目を10点満点で採点し、分野の重みで100点に換算</small></h2>
+        <h2 id="h-sc">総合スコア <small>7分野・26項目を10点満点で採点し、分野の重みで100点に換算</small></h2>
         <div class="score-top">
           <div class="score-big" id="scoreBig"></div>
           <div class="cats" id="cats"></div>
@@ -320,6 +334,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
           <button role="tab" data-tab="book" aria-selected="false">帳簿分析</button>
           <button role="tab" data-tab="rent" aria-selected="false">賃料の適正</button>
           <button role="tab" data-tab="seki" aria-selected="false">積算価格</button>
+          <button role="tab" data-tab="bank" aria-selected="false">銀行評価</button>
           <button role="tab" data-tab="cmp" aria-selected="false">物件比較</button>
         </div>
 
@@ -376,6 +391,47 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
           <p class="note">土地＝土地面積×路線価×補正。建物＝延床面積×再調達単価×残存耐用年数÷法定耐用年数。金融機関ごとに単価や掛け目が異なるため、目安として使ってください。</p>
         </div>
 
+        <div data-panel="bank" hidden>
+          <h2>銀行評価 <small>金融機関の審査目線での積算評価・収益還元評価と融資可能額の試算</small></h2>
+          <div class="bank-in">
+            <div class="lg" style="grid-column:1/-1">積算評価の条件</div>
+            <div class="f"><label for="bLandBasis">土地の評価基準</label><div class="in"><select id="bLandBasis"><option value="1">路線価</option><option value="1.25">公示価格水準（路線価÷0.8）</option></select></div></div>
+            <div class="f"><label for="bkLand">土地の掛目</label><div class="in"><input id="bkLand" type="number" step="5" value="80"><span class="u">%</span></div></div>
+            <div class="f"><label for="bkBldg">建物の掛目</label><div class="in"><input id="bkBldg" type="number" step="5" value="70"><span class="u">%</span></div></div>
+            <div class="f"><label for="bkInc">収益評価の掛目</label><div class="in"><input id="bkInc" type="number" step="5" value="80"><span class="u">%</span></div></div>
+            <div class="lg" style="grid-column:1/-1">収益還元評価の条件（銀行の査定値）</div>
+            <div class="f"><label for="bVac">査定空室率</label><div class="in"><input id="bVac" type="number" step="1" value="20"><span class="u">%</span></div></div>
+            <div class="f"><label for="bExp">査定経費率</label><div class="in"><input id="bExp" type="number" step="1" value="20"><span class="u">%</span></div></div>
+            <div class="f"><label for="bCap">還元利回り</label><div class="in"><input id="bCap" type="number" step="0.1" value="7"><span class="u">%</span></div></div>
+            <div class="f"><label for="bDisc">DCF割引率</label><div class="in"><input id="bDisc" type="number" step="0.1" value="6.5"><span class="u">%</span></div></div>
+            <div class="lg" style="grid-column:1/-1">返済能力の審査条件</div>
+            <div class="f"><label for="bRate">審査金利</label><div class="in"><input id="bRate" type="number" step="0.1" value="4"><span class="u">%</span></div></div>
+            <div class="f"><label for="bDscr">必要DSCR</label><div class="in"><input id="bDscr" type="number" step="0.05" value="1.2"><span class="u">倍</span></div></div>
+            <div class="f"><label for="bRatio">返済比率の上限</label><div class="in"><input id="bRatio" type="number" step="5" value="50"><span class="u">%</span></div></div>
+            <div class="f"><label for="bMaxTerm">融資期間の上限</label><div class="in"><input id="bMaxTerm" type="number" step="1" value="35"><span class="u">年</span></div></div>
+          </div>
+          <p class="note">査定経費率は満室賃料に対する割合（管理費・修繕・固都税・保険を含む）。還元利回りの目安は、東京都心 4〜5%・政令市 5.5〜7%・地方都市 7〜9%。金融機関や地域で大きく変わるため、打診先の基準に合わせて調整してください。</p>
+
+          <h3>融資見込み額</h3>
+          <div class="loan-box" id="loanBox"></div>
+          <h3>評価額の比較</h3>
+          <div class="bars" id="bankBars"></div>
+
+          <h3>積算評価</h3>
+          <div class="scroll"><table id="bankSeki"></table></div>
+
+          <h3>収益還元評価（直接還元法）</h3>
+          <div class="scroll"><table id="bankDirect"></table></div>
+
+          <h3>収益還元評価（DCF法・10年）</h3>
+          <div class="pairs" id="bankDcfSum"></div>
+          <div class="scroll" style="margin-top:8px"><table id="bankDcf"></table></div>
+
+          <h3>融資上限の内訳</h3>
+          <div class="scroll"><table id="bankLimits"></table></div>
+          <p class="note">積算重視型は地銀・信金に多い見方で、担保評価と返済能力の低い方が上限になります。収益重視型は収益還元評価と返済能力の低い方。黄色の行が上限を決めている項目です。審査では個人の属性（年収・金融資産・既存借入）も加味されるため、実際の融資額は前後します。</p>
+        </div>
+
         <div data-panel="cmp" hidden>
           <h2>保存した物件の比較</h2>
           <div class="scroll"><table id="cmp"></table></div>
@@ -394,7 +450,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  const NUM = ["price","gpi","struct","age","landArea","floorArea","bldg","equip","otherRate","vac","decl","opex","ptax","repYear","repAmt","loan","rate","term","taxr","hold","cap","sellc","mkt","rosen","repro","landAdj"];
+  const NUM = ["price","gpi","struct","age","landArea","floorArea","bldg","equip","otherRate","vac","decl","opex","ptax","repYear","repAmt","loan","rate","term","taxr","hold","cap","sellc","mkt","rosen","repro","landAdj","bLandBasis","bkLand","bkBldg","bkInc","bVac","bExp","bCap","bDisc","bRate","bDscr","bRatio","bMaxTerm"];
   const TXT = ["pname","addr"];
   const YEAR = new Date().getFullYear();
   let isNew = false;
@@ -550,6 +606,58 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
     return { land, bldg, total, bRatio, income, ratio: total / p.price, loanCover: a.loan > 0 ? total / a.loan : Infinity };
   }
 
+  // ---------- 銀行評価 ----------
+  const pvAnnuity = (annual, ratePct, years) => {
+    const r = ratePct / 100 / 12, n = Math.round(years * 12), pm = annual / 12;
+    if (n <= 0 || pm <= 0) return 0;
+    return r > 0 ? (pm * (1 - Math.pow(1 + r, -n))) / r : pm * n;
+  };
+  function bankEval(p, a, rs) {
+    const hasLand = p.landArea > 0 && p.rosen > 0;
+    const landUnit = p.rosen * 1000 * p.landAdj * (p.bLandBasis || 1);
+    const land = (p.landArea * landUnit) / 1e4;
+    const bRatio = a.legal > 0 ? a.remainLegal / a.legal : 0;
+    const bldg = p.floorArea * p.repro * bRatio;
+    const seki = land + bldg;
+    const tLand = (land * p.bkLand) / 100, tBldg = (bldg * p.bkBldg) / 100, tanpo = tLand + tBldg;
+    // 収益還元：満室賃料は入力値と相場ベースの低い方を採用
+    const useMkt = rs && isFinite(rs.mktGpi) && rs.mktGpi > 0 && rs.mktGpi < p.gpi;
+    const gpi = useMkt ? rs.mktGpi : p.gpi;
+    const vacLoss = (gpi * p.bVac) / 100, exp = (gpi * p.bExp) / 100;
+    const noi = gpi - vacLoss - exp;
+    const direct = p.bCap > 0 ? noi / (p.bCap / 100) : 0;
+    const directT = (direct * p.bkInc) / 100;
+    // DCF：10年分のNOI現在価値＋復帰価格の現在価値
+    const N = 10, d = p.bDisc / 100, tcap = (p.bCap + 0.5) / 100;
+    const dcfRows = [];
+    let pvSum = 0;
+    for (let t = 1; t <= N; t++) {
+      const n = noi * Math.pow(1 - p.decl / 100, t - 1), df = 1 / Math.pow(1 + d, t);
+      pvSum += n * df; dcfRows.push({ t, noi: n, df, pv: n * df });
+    }
+    const revNoi = noi * Math.pow(1 - p.decl / 100, N);
+    const rev = (revNoi / tcap) * (1 - p.sellc / 100);
+    const revPv = rev / Math.pow(1 + d, N);
+    const dcf = pvSum + revPv;
+    // 返済能力
+    const termMax = Math.max(0, Math.min(p.bMaxTerm, p.isNew ? a.legal : a.remainLegal));
+    const dscrLoan = p.bDscr > 0 ? pvAnnuity(noi / p.bDscr, p.bRate, termMax) : 0;
+    const ratioLoan = pvAnnuity((p.gpi * p.bRatio) / 100, p.bRate, termMax);
+    const capLoan = Math.min(dscrLoan, ratioLoan);
+    const sekiType = hasLand ? Math.min(tanpo, capLoan) : NaN;
+    const incType = Math.min(directT, capLoan);
+    const best = Math.max(isFinite(sekiType) ? sekiType : 0, incType);
+    const limits = [
+      { k: "担保評価（積算×掛目）", v: tanpo, type: "seki", note: `土地${p.bkLand}%・建物${p.bkBldg}%`, na: !hasLand },
+      { k: "収益還元評価×掛目", v: directT, type: "inc", note: `直接還元 ${fmt(direct, 0)}万円×${p.bkInc}%` },
+      { k: "返済能力（DSCR基準）", v: dscrLoan, type: "both", note: `審査金利${p.bRate}%・${termMax}年・DSCR${p.bDscr}倍` },
+      { k: "返済能力（返済比率基準）", v: ratioLoan, type: "both", note: `満室賃料の${p.bRatio}%まで返済` },
+    ];
+    return { hasLand, landUnit, land, bldg, bRatio, seki, tLand, tBldg, tanpo, useMkt, gpi, vacLoss, exp, noi, direct, directT,
+      N, dcfRows, pvSum, rev, revPv, revNoi, tcap, dcf, termMax, dscrLoan, ratioLoan, capLoan, sekiType, incType, best, limits,
+      short: Math.max(0, a.loan - best), needEquity: a.total - best };
+  }
+
   // ---------- 判定 ----------
   function judge(a, rs, sk) {
     const al = [];
@@ -585,6 +693,10 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
       if (sk.ratio < 0.7) add("warn", `<b>積算評価 ${fmt(sk.total, 0)}万円 は価格の${pct(sk.ratio, 0)}</b>。積算重視の金融機関では融資額が伸びず、自己資金が多く必要になります。`);
       else if (sk.ratio >= 1) add("ok", `<b>積算評価 ${fmt(sk.total, 0)}万円 が価格を上回ります（${pct(sk.ratio, 0)}）。</b>担保評価が出やすい物件です。`);
     }
+    const bk = bankEval(p, a, rs);
+    if (bk.termMax <= 0 && a.loan > 0) add("bad", "<b>法定耐用年数が残っていないため、耐用年数基準の金融機関では融資期間が取れません。</b>");
+    else if (a.loan > bk.best * 1.02) add("bad", `<b>想定借入 ${fmt(a.loan, 0)}万円 は銀行評価の融資見込み ${fmt(bk.best, 0)}万円 を上回ります。</b>自己資金が約${fmt(bk.short, 0)}万円多く必要になる可能性があります（銀行評価タブ参照）。`);
+    else if (a.loan > 0) add("ok", `<b>想定借入 ${fmt(a.loan, 0)}万円 は銀行評価の融資見込み ${fmt(bk.best, 0)}万円 の範囲内です。</b>`);
     if (a.equity <= 0) add("info", "<b>フルローン以上</b>のため自己資金利回り・IRRは計算できません。返済余力を重点的に確認してください。");
     if (p.isNew) add("info", "新築は売主物件のため仲介手数料は不要です。新築プレミアム分の家賃は数年で下がりやすく、下落率は厳しめに置いてください。");
     if (!p.isNew && p.age >= a.legal) add("warn", `<b>法定耐用年数を経過した物件です。</b>償却は${a.lifeS}年で終わり、融資期間も短くなりがちです。`);
@@ -659,6 +771,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
   const lin = (v, bad, good) => (isFinite(v) ? Math.max(0, Math.min(10, ((v - bad) / (good - bad)) * 10)) : NaN);
   function scoreAll(a, rs, sk) {
     const p = a.p, H = a.H;
+    const bk = bankEval(p, a, rs);
     const up2 = analyze(p, { rate: p.rate + 2 });
     const minRow = a.rows.slice(0, H).reduce((x, y) => (y.atcf < x.atcf ? y : x));
     const buyNoi = a.y1.noi / p.price;
@@ -700,10 +813,11 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
         it("相場より高い部屋の割合", hasMkt ? pct(rs.over.length / rs.n, 0) : "—", hasMkt ? lin(rs.over.length / rs.n, 0.5, 0) : NaN, "50%→0点／0%→10点", hasMkt && rs.over.length ? `${rs.over.length}室が退去時に減額の見込み` : "減額リスクの高い部屋なし", !hasMkt),
         it("現況の入居率", hasRoll ? pct(rs.occRate, 0) : "—", hasRoll ? lin(rs.occRate, 0.7, 0.95) : NaN, "70%→0点／95%→10点", hasRoll && rs.occRate < 0.85 ? "空室が多い。原因（賃料・設備・立地）を確認" : "入居は安定", !hasRoll),
       ]},
-      { key: "seki", name: "積算", weight: 10, items: [
+      { key: "seki", name: "積算・銀行評価", weight: 10, items: [
+        it("想定借入÷銀行の融資見込み", a.loan > 0 ? pct(a.loan / bk.best, 0) : "—", lin(a.loan / bk.best, 1.3, 0.9), "130%→0点／90%以下→10点", a.loan > bk.best ? `銀行評価より約${fmt(bk.short, 0)}万円多く借りる想定` : "銀行評価の範囲内で借りられる見込み", a.loan <= 0 || !(bk.best > 0)),
         it("積算価格÷物件価格", hasSeki ? pct(sk.ratio, 0) : "—", hasSeki ? lin(sk.ratio, 0.5, 1.0) : NaN, "50%→0点／100%→10点", hasSeki && sk.ratio < 0.7 ? "担保評価が出にくく自己資金が多く要る" : "担保評価は出やすい", !hasSeki),
         it("積算価格÷借入額", hasSeki && a.loan > 0 ? pct(sk.loanCover, 0) : "—", hasSeki ? lin(sk.loanCover, 0.6, 1.1) : NaN, "60%→0点／110%→10点", hasSeki && sk.loanCover < 1 ? "借入額が担保評価を上回る" : "担保で借入をカバー", !hasSeki || a.loan <= 0),
-        it("収益価格÷物件価格", pct(sk.income / p.price, 0), lin(sk.income / p.price, 0.8, 1.1), "80%→0点／110%→10点", sk.income < p.price * 0.95 ? "収益から見ると割高" : "収益に見合う価格"),
+        it("銀行の収益還元評価÷物件価格", pct(bk.direct / p.price, 0), lin(bk.direct / p.price, 0.6, 1.0), "60%→0点／100%→10点", bk.direct < p.price * 0.8 ? "銀行の収益評価では割高" : "銀行の収益評価でも価格に見合う"),
         it("土地評価の割合", hasSeki ? pct(sk.land / sk.total, 0) : "—", hasSeki ? lin(sk.land / sk.total, 0.2, 0.6) : NaN, "20%→0点／60%→10点", hasSeki && sk.land / sk.total < 0.35 ? "価値の多くが目減りする建物" : "土地が価値を下支え", !hasSeki),
       ]},
     ];
@@ -746,6 +860,50 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
       });
     });
     $("items").innerHTML = h;
+  }
+
+  function renderBank(p, a, bk) {
+    const surplus = bk.best - a.loan;
+    $("loanBox").innerHTML = [
+      ["融資見込み額（評価の高い方式）", fmt(bk.best, 0) + "万円", `積算重視型 ${isFinite(bk.sekiType) ? fmt(bk.sekiType, 0) : "—"}／収益重視型 ${fmt(bk.incType, 0)}`],
+      ["想定借入額との差", (surplus >= 0 ? "+" : "") + fmt(surplus, 0) + "万円", surplus >= 0 ? "見込みの範囲内" : "この分の自己資金追加が必要", surplus < 0 ? "neg" : "pos"],
+      ["必要な自己資金（見込み額で借りた場合）", fmt(bk.needEquity, 0) + "万円", `総投資額 ${fmt(a.total, 0)}万円 − 融資見込み`],
+    ].map(([k, v, d, c]) => `<div><span class="k">${k}</span><span class="v ${c || ""}">${v}</span><span class="d">${d}</span></div>`).join("");
+    const mx = Math.max(p.price, bk.seki, bk.direct, bk.dcf, a.loan, 1);
+    const bar = (lbl, v, col) => `<div class="bar-row"><span>${lbl}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, (v / mx) * 100))}%;background:${col}"></div></div><span class="val">${isFinite(v) ? fmt(v, 0) + "万円" : "—"}</span></div>`;
+    $("bankBars").innerHTML = bar("物件価格", p.price, "var(--ink-2)") + bar("積算評価", bk.hasLand ? bk.seki : NaN, "var(--accent)") + bar("担保評価", bk.hasLand ? bk.tanpo : NaN, "var(--accent)")
+      + bar("直接還元", bk.direct, "var(--ok)") + bar("DCF", bk.dcf, "var(--ok)") + bar("返済能力上限", bk.capLoan, "var(--warn)") + bar("想定借入額", a.loan, "var(--neg)");
+    $("bankSeki").innerHTML = `<tr><th>区分</th><th>数量</th><th>単価</th><th>補正</th><th>評価額</th><th>掛目</th><th>担保評価</th></tr>
+      <tr><td>土地</td><td>${fmt(p.landArea, 1)}㎡</td><td>${fmt(p.rosen * 1000 * (p.bLandBasis || 1), 0)}円/㎡</td><td>×${p.landAdj}${+p.bLandBasis > 1 ? "（公示水準）" : "（路線価）"}</td><td>${fmt(bk.land, 0)}</td><td>${p.bkLand}%</td><td>${fmt(bk.tLand, 0)}</td></tr>
+      <tr><td>建物</td><td>${fmt(p.floorArea, 1)}㎡</td><td>${fmt(p.repro, 1)}万円/㎡</td><td>残存${a.remainLegal}/${a.legal}年（${pct(bk.bRatio, 0)}）</td><td>${fmt(bk.bldg, 0)}</td><td>${p.bkBldg}%</td><td>${fmt(bk.tBldg, 0)}</td></tr>
+      <tr class="sum"><td>合計</td><td></td><td></td><td></td><td>${fmt(bk.seki, 0)}</td><td></td><td>${fmt(bk.tanpo, 0)}</td></tr>
+      <tr><td>価格に対する割合</td><td></td><td></td><td></td><td>${pct(bk.seki / p.price, 0)}</td><td></td><td>${pct(bk.tanpo / p.price, 0)}</td></tr>`;
+    $("bankDirect").innerHTML = `<tr><th>項目</th><th>金額（万円/年）</th><th>根拠</th></tr>
+      <tr><td>満室賃料（採用値）</td>${c1(bk.gpi, 0)}<td style="font-family:var(--f-body)">${bk.useMkt ? "相場賃料ベース（入力値より低いため採用）" : "入力した満室想定年収"}</td></tr>
+      <tr><td>空室損</td>${c1(-bk.vacLoss, 0)}<td style="font-family:var(--f-body)">査定空室率 ${p.bVac}%</td></tr>
+      <tr><td>経費</td>${c1(-bk.exp, 0)}<td style="font-family:var(--f-body)">査定経費率 ${p.bExp}%</td></tr>
+      <tr class="sum"><td>査定NOI</td>${c1(bk.noi, 0)}<td style="font-family:var(--f-body)">あなたの試算NOI ${fmt(a.y1.noi, 0)}万円</td></tr>
+      <tr><td>還元利回り</td><td>${p.bCap}%</td><td></td></tr>
+      <tr class="sum"><td>収益還元評価</td>${c1(bk.direct, 0)}<td style="font-family:var(--f-body)">査定NOI÷還元利回り（価格の${pct(bk.direct / p.price, 0)}）</td></tr>
+      <tr><td>掛目後</td>${c1(bk.directT, 0)}<td style="font-family:var(--f-body)">×${p.bkInc}%</td></tr>`;
+    $("bankDcfSum").innerHTML = pairs([
+      ["10年間のNOI現在価値", fmt(bk.pvSum, 0) + "万円"], ["復帰価格（11年目NOI÷" + (bk.tcap * 100).toFixed(1) + "%−売却費用）", fmt(bk.rev, 0) + "万円"],
+      ["復帰価格の現在価値", fmt(bk.revPv, 0) + "万円"], ["DCF価格", `<b>${fmt(bk.dcf, 0)}万円</b>`], ["価格に対する割合", pct(bk.dcf / p.price, 0)], ["割引率／最終還元利回り", `${p.bDisc}%／${(bk.tcap * 100).toFixed(1)}%`],
+    ]);
+    $("bankDcf").innerHTML = `<tr><th>年</th>${bk.dcfRows.map((r) => `<th>${r.t}</th>`).join("")}</tr>
+      <tr><td>査定NOI</td>${bk.dcfRows.map((r) => c1(r.noi, 0)).join("")}</tr>
+      <tr><td>複利現価率</td>${bk.dcfRows.map((r) => `<td>${r.df.toFixed(3)}</td>`).join("")}</tr>
+      <tr><td>現在価値</td>${bk.dcfRows.map((r) => c1(r.pv, 0)).join("")}</tr>`;
+    const sekiMin = bk.hasLand ? Math.min(bk.tanpo, bk.capLoan) : NaN;
+    const incMin = Math.min(bk.directT, bk.capLoan);
+    let lt = `<tr><th>上限の根拠</th><th>上限額（万円）</th><th>条件</th><th>積算重視型</th><th>収益重視型</th></tr>`;
+    bk.limits.forEach((l) => {
+      const inS = l.type === "seki" || l.type === "both", inI = l.type === "inc" || l.type === "both";
+      const isMin = (inS && Math.abs(l.v - sekiMin) < 1e-6) || (inI && Math.abs(l.v - incMin) < 1e-6);
+      lt += `<tr class="${isMin && !l.na ? "min" : ""}"><td>${l.k}</td>${l.na ? "<td>—</td>" : c1(l.v, 0)}<td style="font-family:var(--f-body)">${l.na ? "土地面積・路線価が未入力" : l.note}</td><td>${inS ? "対象" : ""}</td><td>${inI ? "対象" : ""}</td></tr>`;
+    });
+    lt += `<tr class="sum"><td>融資見込み</td><td></td><td></td><td>${isFinite(bk.sekiType) ? fmt(bk.sekiType, 0) : "—"}</td><td>${fmt(bk.incType, 0)}</td></tr>`;
+    $("bankLimits").innerHTML = lt;
   }
 
   let current = null;
@@ -858,6 +1016,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
     ]);
 
     renderScore(scoreAll(a, rs, sk));
+    renderBank(p, a, bankEval(p, a, rs));
     renderCompare();
     $("memoBar").hidden = !sampleFn;
   }
@@ -976,7 +1135,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
   $("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) selectTab(b.dataset.tab); });
   const hashTab = (location.hash || "").slice(1);
   let savedTab = null; try { savedTab = localStorage.getItem("re-analyzer-tab"); } catch (e) {}
-  if (["cf","exit","book","rent","seki","cmp"].includes(hashTab)) selectTab(hashTab); else if (savedTab) selectTab(savedTab);
+  if (["cf","exit","book","rent","seki","bank","cmp"].includes(hashTab)) selectTab(hashTab); else if (savedTab) selectTab(savedTab);
 
   // ---------- 資料の読み込み ----------
   let files = [];
@@ -1211,6 +1370,7 @@ table.roll select { border: 1px solid var(--line); border-radius: 4px; backgroun
       `デッドクロス${a.deadCross || "なし"}年目、償却 躯体${a.lifeS}年・設備${a.lifeE}年`,
       rs ? `レントロール${rs.n}戸・入居率${pct(rs.occRate, 0)}・平均${fmt(rs.unitAvg)}円/㎡、相場${p.mkt}円/㎡、相場超${rs.over.length}室` : "レントロールなし",
       p.landArea > 0 ? `積算${fmt(sk.total)}万円（価格比${pct(sk.ratio, 0)}）、収益価格${fmt(sk.income)}万円` : "積算データなし",
+      (() => { const bk = bankEval(p, a, rs); return `銀行評価：担保評価${fmt(bk.tanpo)}万円、直接還元${fmt(bk.direct)}万円（還元${p.bCap}%）、DCF${fmt(bk.dcf)}万円、返済能力上限${fmt(bk.capLoan)}万円、融資見込み${fmt(bk.best)}万円、想定借入${fmt(a.loan)}万円`; })(),
       (() => { const sc = scoreAll(a, rs, sk); return `総合スコア${sc.total}点（${sc.grade}）／` + sc.cats.map((c) => `${c.name}${c.na ? "対象外" : c.score + "点"}`).join("・") + "。低評価項目：" + sc.cats.flatMap((c) => c.items.filter((x) => !x.na && x.pts < 4).map((x) => `${x.name}(${x.val})`)).join("、"); })(),
       "自動チェックの指摘：" + j.al.map((x) => x.t.replace(/<[^>]+>/g, "")).join(" / "),
     ].join("\n");
