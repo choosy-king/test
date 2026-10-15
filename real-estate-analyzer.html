@@ -215,6 +215,27 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 .in.general { border-color: var(--line); background: var(--panel); }
 .gtag { display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
 .gen-list { font-size: .8rem; color: var(--ink-2); margin: 10px 0 0; }
+/* 融資条件の質問 */
+.wiz { border: 1.5px solid var(--accent); }
+.wiz-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wiz-prog { display: flex; gap: 4px; margin: 4px 0 14px; }
+.wiz-prog i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.wiz-prog i.on { background: var(--accent); }
+.wiz-q { font-family: var(--f-display); font-size: 1.15rem; margin: 0 0 4px; text-wrap: balance; }
+.wiz-help { font-size: .82rem; color: var(--ink-2); margin: 0 0 12px; max-width: 70ch; }
+.wiz-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.wiz-opt { text-align: left; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 10px 12px; cursor: pointer; font: .9rem var(--f-body); display: flex; flex-direction: column; gap: 2px; }
+.wiz-opt:hover { border-color: var(--accent); }
+.wiz-opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.wiz-opt b { font-weight: 700; }
+.wiz-opt small { color: var(--ink-3); font-size: .74rem; }
+.wiz-num { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.wiz-num .in { max-width: 240px; flex: 1; min-width: 160px; }
+.wiz-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.wiz-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 20px; font-size: .88rem; }
+.wiz-sum div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+.wiz-sum span:last-child { font-family: var(--f-num); text-align: right; }
+.wiz-err { color: var(--neg); font-size: .82rem; margin-top: 6px; }
 </style>
 
 <div class="wrap">
@@ -303,6 +324,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
       <fieldset>
         <legend>融資・税（打診結果・ご自身の税率）</legend>
+        <button class="btn ghost sm full" type="button" id="finAsk" style="grid-column:1/-1">融資条件を質問に答えて入力</button>
         <div class="f"><label for="loan">借入額</label><div class="in"><input id="loan" type="number" step="10"><span class="u">万円</span></div></div>
         <div class="f"><label for="rate">金利</label><div class="in"><input id="rate" type="number" step="0.05"><span class="u">%</span></div></div>
         <div class="f"><label for="term">期間</label><div class="in"><input id="term" type="number" step="1"><span class="u">年</span></div></div>
@@ -337,8 +359,22 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     </aside>
 
     <main class="out">
+      <section class="card wiz" aria-labelledby="h-wiz" id="finWiz" hidden>
+        <div class="wiz-head">
+          <h2 id="h-wiz">融資条件の質問 <small id="wizStep"></small></h2>
+          <button class="btn ghost sm" type="button" id="wizClose">閉じる</button>
+        </div>
+        <div class="wiz-prog" id="wizProg"></div>
+        <div id="wizBody"></div>
+        <div class="wiz-nav">
+          <button class="btn ghost" type="button" id="wizBack">戻る</button>
+          <button class="btn" type="button" id="wizNext">次へ</button>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="h-need" id="needCard">
         <h2 id="h-need">入力データの状況 <small id="needSub"></small></h2>
+        <div class="row-btns" id="finAskBar" hidden style="margin:-4px 0 12px"><button class="btn sm" type="button" id="finAsk2">融資条件を質問に答えて入力</button><span class="status">借入額・金利・期間が未入力です</span></div>
         <div class="need-grid" id="needGrid"></div>
         <p class="gen-list" id="genList"></p>
       </section>
@@ -605,6 +641,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     NUM.forEach((k) => { const v = $(k).value; o[k] = v === "" ? NaN : parseFloat(v); });
     TXT.forEach((k) => { o[k] = $(k).value; });
     o.isNew = isNew;
+    o.finType = finType;
+    o.finSrc = finSrc;
     if (isNew === true) o.age = 0;
     o.roll = roll.map((r) => Object.assign({}, r));
     return o;
@@ -875,6 +913,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       else if (a.loan > 0) add("ok", `<b>借入額 ${fmt(a.loan, 0)}万円 は銀行評価の融資見込み ${fmt(bk.best, 0)}万円 の範囲内です。</b>`);
     }
     if (a.loan > 0 && a.equity <= 0) add("info", "<b>フルローン以上</b>のため自己資金利回り・IRRは計算できません。");
+    if (a.loan > 0 && a.src.finType === "var") add("warn", `<b>変動金利です。</b>金利+1%で年間返済は約${fmt(analyze(a.src, { rate: p.rate + 1 }).y1.ds - a.y1.ds, 0)}万円増えます。感応度表で耐えられる金利を確認してください。`);
+    if (a.loan > 0 && a.src.finSrc === "rough") add("info", "<b>融資条件は金融機関への打診前の目安です。</b>打診で条件が出たら置き換えてください。");
     if (p.isNew) add("info", "新築は売主物件のため仲介手数料は不要です。新築時の家賃は数年で下がりやすいため、家賃下落率の根拠を確認してください。");
     if (p.isNew === false && p.age >= a.legal) add("warn", `<b>法定耐用年数を経過した物件です。</b>償却は${a.lifeS}年で終わり、融資期間も短くなりがちです。`);
     extNotes.forEach((t) => add("warn", `<b>資料記載：</b>${esc(t)}`));
@@ -1070,6 +1110,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     }));
     NUM.forEach((k) => { const box = $(k).closest(".in"); if (box) box.classList.toggle("missing", missIds.has(k)); });
     $("kindSeg").style.outline = p.isNew === null ? "1.5px dashed var(--warn)" : "";
+    $("finAskBar").hidden = fin(p.loan) && (p.loan === 0 || (fin(p.rate) && fin(p.term)));
     const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
     $("genList").innerHTML = gens.length ? `<b>一般値を入れている前提（${gens.length}項目）：</b>` + gens.map((k) => `${LABEL[k]} ${$(k).value !== "" ? esc($(k).tagName === "SELECT" ? $(k).selectedOptions[0].text : $(k).value) : "（" + (k === "cap" ? "基本の収支が揃うと自動計算" : "構造を選ぶと自動設定") + "）"}`).join("、") + "。入力欄の「一般値」の印は、値を書き換えると外れます。各値の根拠は入力欄にカーソルを合わせると表示されます。" : "";
   }
@@ -1321,6 +1362,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     NUM.concat(TXT).forEach((k) => { const v = p[k]; $(k).value = v === null || v === undefined || (typeof v === "number" && !fin(v)) ? "" : v; });
     roll = Array.isArray(p.roll) ? p.roll.map((r) => Object.assign({}, r)) : [];
     setKind(p.isNew === true ? true : p.isNew === false ? false : null);
+    finType = p.finType || null; finSrc = p.finSrc || null;
     document.querySelectorAll(".in.filled").forEach((x) => x.classList.remove("filled"));
     Object.keys(GENERAL).forEach((k) => { genMode[k] = false; });
     markGeneral();
@@ -1636,7 +1678,7 @@ JSONオブジェクト1つだけで答える：
     const facts = [
       `物件：${p.pname || "名称未入力"}（${p.addr || "所在地未入力"}）${p.isNew ? "新築" : "中古"}・${$("struct").selectedOptions[0].text}・築${a.p.age}年`,
       `価格${fmt(p.price)}万円、満室年収${fmt(p.gpi)}万円、表面${pct(a.surface)}、FCR${pct(a.fcr)}、K${pct(a.k)}`,
-      `借入${fmt(a.loan)}万円・金利${a.p.rate}%・${a.p.term}年、自己資金${fmt(a.equity)}万円、DSCR${a.loan > 0 ? a.dscr.toFixed(2) : "借入なし"}、損益分岐入居率${pct(a.ber, 1)}`,
+      `借入${fmt(a.loan)}万円・金利${a.p.rate}%（${{ var: "変動", fix: "固定", unknown: "種類未定" }[p.finType] || "種類未入力"}${p.finSrc === "rough" ? "・打診前の目安" : p.finSrc === "offer" ? "・金融機関の提示条件" : ""}）・${a.p.term}年、自己資金${fmt(a.equity)}万円、DSCR${a.loan > 0 ? a.dscr.toFixed(2) : "借入なし"}、損益分岐入居率${pct(a.ber, 1)}`,
       `初年度税引前CF${fmt(a.y1.btcf, 1)}万円` + (a.ok.tax ? `、税引後${fmt(a.y1.atcf, 1)}万円` : ""),
       a.ok.exit ? `${a.H}年保有で売却：手取り${fmt(a.s.net)}万円、IRR${pct(a.irr)}。IRR最大は${best ? best.h + "年目" : "—"}` : "",
       a.ok.tax ? `デッドクロス${a.deadCross || "なし"}年目` : "",
@@ -1662,6 +1704,138 @@ ${facts}`, { signal: (ctl = new AbortController()).signal, onText: ({ text }) =>
       st.textContent = e && e.code === "cancelled" ? "" : errText(e);
     } finally { $("memoBtn").disabled = false; }
   });
+
+  // ---------- 融資条件の質問 ----------
+  let finType = null, finSrc = null;
+  let wiz = null;
+  function openWiz() {
+    const p = read();
+    wiz = { i: 0, ans: { method: null, status: null, loanMode: null, loan: fin(p.loan) && p.loan > 0 ? p.loan : NaN, equity: NaN, type: finType, rate: fin(p.rate) ? p.rate : NaN, term: fin(p.term) ? p.term : NaN }, err: "" };
+    $("finWiz").hidden = false;
+    drawWiz();
+    $("finWiz").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function wizSteps() {
+    const a = wiz.ans;
+    if (a.method === "cash") return ["method", "confirm"];
+    return ["method", "status", "loan", "type", "rate", "term", "confirm"];
+  }
+  function priceInfo() {
+    const p = read(), q = calcValues(p);
+    const price = fin(p.price) ? p.price : NaN;
+    const brokerage = q.isNew === false && price > 400 ? (price * 0.03 + 6) * 1.1 : 0;
+    const total = fin(price) ? price + brokerage + (price * (fin(p.otherRate) ? p.otherRate : 0)) / 100 : NaN;
+    const remain = fin(p.struct) ? (p.isNew === true ? p.struct : fin(p.age) ? Math.max(0, p.struct - p.age) : NaN) : NaN;
+    return { price, total, remain };
+  }
+  const opt = (val, title, sub, sel) => `<button type="button" class="wiz-opt" data-v="${val}" aria-pressed="${sel ? "true" : "false"}"><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</button>`;
+  const numBox = (id, val, unit, ph) => `<div class="wiz-num"><div class="in"><input id="${id}" type="number" step="any" value="${fin(val) ? val : ""}" placeholder="${ph || ""}"><span class="u">${unit}</span></div></div>`;
+  function drawWiz() {
+    const steps = wizSteps(), key = steps[wiz.i], a = wiz.ans, pi = priceInfo();
+    $("wizStep").textContent = `${wiz.i + 1} / ${steps.length}`;
+    $("wizProg").innerHTML = steps.map((_, i) => `<i class="${i <= wiz.i ? "on" : ""}"></i>`).join("");
+    $("wizBack").disabled = wiz.i === 0;
+    $("wizNext").textContent = key === "confirm" ? "この条件で反映する" : "次へ";
+    let h = "";
+    if (key === "method") {
+      h = `<p class="wiz-q">購入資金はどのように用意しますか？</p><p class="wiz-help">融資を使う場合は、このあと借入額・金利・期間を順にお聞きします。</p>
+        <div class="wiz-opts">${opt("loan", "融資を使う", "金融機関から借り入れる", a.method === "loan")}${opt("cash", "現金で購入", "借入なし（借入額0）", a.method === "cash")}</div>`;
+    } else if (key === "status") {
+      h = `<p class="wiz-q">金融機関から融資条件は出ていますか？</p><p class="wiz-help">提示された条件があれば、その数字をそのまま入力します。まだの場合は一般的な目安から選べます（目安であることは判定欄に表示されます）。</p>
+        <div class="wiz-opts">${opt("offer", "条件の提示を受けている", "金融機関の回答・事前審査の結果がある", a.status === "offer")}${opt("rough", "まだ打診していない", "一般的な目安で試算する", a.status === "rough")}</div>`;
+    } else if (key === "loan") {
+      const hasP = fin(pi.price);
+      const ratios = [[1, "フルローン（価格の100%）"], [0.9, "価格の90%"], [0.8, "価格の80%"], [0.7, "価格の70%"]];
+      h = `<p class="wiz-q">いくら借りますか？</p><p class="wiz-help">${hasP ? `物件価格 ${fmt(pi.price, 0)}万円、諸費用込みの総投資額 ${fmt(pi.total, 0)}万円です。` : "物件価格が未入力のため、金額で入力してください。"}${a.status === "offer" ? "提示された借入額を入力してください。" : ""}</p>
+        ${hasP ? `<div class="wiz-opts">${ratios.map(([r, t]) => opt("r" + r, t, `${fmt(pi.price * r, 0)}万円`, a.loanMode === "r" + r)).join("")}${opt("over", "諸費用込み（オーバーローン）", `${fmt(pi.total, 0)}万円`, a.loanMode === "over")}${opt("eq", "自己資金の額から決める", "総投資額−自己資金", a.loanMode === "eq")}${opt("amt", "金額を入力する", "", a.loanMode === "amt")}</div>` : ""}
+        ${!hasP || a.loanMode === "amt" ? numBox("wLoan", a.loan, "万円", "借入額") : ""}
+        ${hasP && a.loanMode === "eq" ? numBox("wEq", a.equity, "万円（自己資金）", "自己資金") : ""}`;
+    } else if (key === "type") {
+      h = `<p class="wiz-q">金利のタイプはどれですか？</p><p class="wiz-help">変動金利の場合は、金利上昇時の影響を判定欄で注意喚起します。</p>
+        <div class="wiz-opts">${opt("var", "変動金利", "市場金利に合わせて見直される", a.type === "var")}${opt("fix", "固定金利", "期間中（または一定期間）金利が変わらない", a.type === "fix")}${opt("unknown", "まだ分からない", "", a.type === "unknown")}</div>`;
+    } else if (key === "rate") {
+      const tiers = [[1.0, "1.0%", "都市銀行・属性が良い場合の目安"], [2.0, "2.0%", "地方銀行・信用金庫の一般的な目安"], [3.0, "3.0%", "一部の信金・ノンバンク系の目安"], [4.0, "4.0%", "ノンバンク系の目安"]];
+      h = `<p class="wiz-q">金利は何%ですか？</p><p class="wiz-help">${a.status === "offer" ? "提示された金利を入力してください。" : "打診前の場合は目安から選ぶか、分かっていれば入力してください。"}</p>
+        ${a.status === "rough" ? `<div class="wiz-opts">${tiers.map(([v, t, sub]) => opt("t" + v, t, sub, a.rateMode === "t" + v)).join("")}${opt("in", "数値を入力する", "", a.rateMode === "in")}</div>` : ""}
+        ${a.status === "offer" || a.rateMode === "in" ? numBox("wRate", a.rate, "%", "例 2.2") : ""}`;
+    } else if (key === "term") {
+      const rem = pi.remain;
+      const choices = [];
+      if (fin(rem) && rem > 0) choices.push(["rem", `残存耐用年数（${Math.min(rem, 35)}年）`, "多くの金融機関が上限とする期間", Math.min(rem, 35)]);
+      [35, 30, 25, 20].forEach((y) => { if (!(fin(rem) && y === Math.min(rem, 35))) choices.push(["y" + y, `${y}年`, fin(rem) && y > rem ? `残存耐用年数${rem}年を超えます` : "", y]); });
+      h = `<p class="wiz-q">返済期間は何年ですか？</p><p class="wiz-help">${fin(rem) ? `この物件の残存法定耐用年数は${rem}年です。` : "構造・築年数が未入力のため、残存耐用年数は表示できません。"}${a.status === "offer" ? "提示された期間を選ぶか入力してください。" : ""}</p>
+        <div class="wiz-opts">${choices.map(([k, t, sub]) => opt(k, t, sub, a.termMode === k)).join("")}${opt("in", "年数を入力する", "", a.termMode === "in")}</div>
+        ${a.termMode === "in" ? numBox("wTerm", a.term, "年", "例 25") : ""}`;
+      wiz.termChoices = choices;
+    } else if (key === "confirm") {
+      const rows = a.method === "cash" ? [["購入方法", "現金（借入なし）"]] : (() => {
+        const r = a.rate / 100 / 12, n = Math.round(a.term * 12);
+        const pm = r > 0 ? (a.loan * r) / (1 - Math.pow(1 + r, -n)) : a.loan / n;
+        return [["借入額", fmt(a.loan, 0) + "万円"], ["金利", `${a.rate}%（${{ var: "変動", fix: "固定", unknown: "未定" }[a.type]}）`], ["期間", a.term + "年"],
+          ["月額返済", fmt(pm, 1) + "万円"], ["年間返済", fmt(pm * 12, 0) + "万円"], ["自己資金", fin(pi.total) ? fmt(pi.total - a.loan, 0) + "万円" : "価格・諸費用率の入力後に計算"],
+          ["条件の出どころ", a.status === "offer" ? "金融機関の提示条件" : "打診前の目安"]];
+      })();
+      h = `<p class="wiz-q">この条件で反映しますか？</p><p class="wiz-help">反映すると左の入力欄に入り、すべての分析が更新されます。あとから入力欄で直接変更することもできます。</p>
+        <div class="wiz-sum">${rows.map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("")}</div>`;
+    }
+    $("wizBody").innerHTML = h + (wiz.err ? `<p class="wiz-err">${wiz.err}</p>` : "");
+    const firstNum = $("wizBody").querySelector("input");
+    if (firstNum) firstNum.focus();
+  }
+  $("wizBody").addEventListener("click", (e) => {
+    const b = e.target.closest(".wiz-opt");
+    if (!b) return;
+    const key = wizSteps()[wiz.i], a = wiz.ans, v = b.dataset.v, pi = priceInfo();
+    wiz.err = "";
+    if (key === "method") a.method = v;
+    else if (key === "status") a.status = v;
+    else if (key === "loan") {
+      a.loanMode = v;
+      if (v[0] === "r") a.loan = Math.round(pi.price * +v.slice(1));
+      else if (v === "over") a.loan = Math.round(pi.total);
+    } else if (key === "type") a.type = v;
+    else if (key === "rate") { a.rateMode = v; if (v[0] === "t") a.rate = +v.slice(1); }
+    else if (key === "term") { a.termMode = v; const c = (wiz.termChoices || []).find((x) => x[0] === v); if (c) a.term = c[3]; }
+    const needsInput = (key === "loan" && (v === "amt" || v === "eq")) || ((key === "rate" || key === "term") && v === "in");
+    if (needsInput) { drawWiz(); return; }
+    drawWiz();
+    if (key !== "confirm") setTimeout(next, 120);
+  });
+  $("wizBody").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); next(); } });
+  function next() {
+    const steps = wizSteps(), key = steps[wiz.i], a = wiz.ans, pi = priceInfo();
+    const num = (id) => { const el = $(id); return el && el.value !== "" ? parseFloat(el.value) : NaN; };
+    wiz.err = "";
+    if (key === "method" && !a.method) wiz.err = "どちらかを選んでください。";
+    if (key === "status" && !a.status) wiz.err = "どちらかを選んでください。";
+    if (key === "loan") {
+      if ($("wLoan")) a.loan = num("wLoan");
+      if ($("wEq")) { a.equity = num("wEq"); a.loan = fin(a.equity) ? Math.round(pi.total - a.equity) : NaN; }
+      if (!fin(a.loan) || a.loan <= 0) wiz.err = "借入額を選ぶか入力してください。";
+    }
+    if (key === "type" && !a.type) wiz.err = "いずれかを選んでください。";
+    if (key === "rate") { if ($("wRate")) a.rate = num("wRate"); if (!fin(a.rate) || a.rate < 0 || a.rate > 20) wiz.err = "金利を0〜20%の範囲で選ぶか入力してください。"; }
+    if (key === "term") { if ($("wTerm")) a.term = num("wTerm"); if (!fin(a.term) || a.term < 1 || a.term > 50) wiz.err = "期間を1〜50年の範囲で選ぶか入力してください。"; }
+    if (wiz.err) { drawWiz(); return; }
+    if (key === "confirm") { applyWiz(); return; }
+    wiz.i = Math.min(steps.length - 1, wiz.i + 1);
+    drawWiz();
+  }
+  function applyWiz() {
+    const a = wiz.ans;
+    if (a.method === "cash") { $("loan").value = 0; $("rate").value = ""; $("term").value = ""; finType = null; finSrc = null; }
+    else { $("loan").value = a.loan; $("rate").value = a.rate; $("term").value = a.term; finType = a.type; finSrc = a.status; }
+    ["loan", "rate", "term"].forEach((k) => $(k).closest(".in").classList.add("filled"));
+    $("finWiz").hidden = true;
+    wiz = null;
+    render();
+  }
+  $("wizNext").addEventListener("click", next);
+  $("wizBack").addEventListener("click", () => { if (wiz.i > 0) { wiz.i--; wiz.err = ""; drawWiz(); } });
+  $("wizClose").addEventListener("click", () => { $("finWiz").hidden = true; wiz = null; });
+  $("finAsk").addEventListener("click", openWiz);
+  $("finAsk2").addEventListener("click", openWiz);
+  ["loan", "rate", "term"].forEach((k) => $(k).addEventListener("input", () => { if (k !== "loan" || +$("loan").value > 0) finSrc = finSrc === "rough" || finSrc === "offer" ? "manual" : finSrc; }));
 
   // ---------- 起動 ----------
   applyGeneral();
