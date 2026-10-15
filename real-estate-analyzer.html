@@ -212,6 +212,9 @@ details.src { margin-top: 10px; font-size: .84rem; }
 details.src summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 details.src td:last-child { white-space: normal; font-family: var(--f-body); color: var(--ink-2); text-align: left; min-width: 18em; }
 .head-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.in.general { border-color: var(--line); background: var(--panel); }
+.gtag { display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+.gen-list { font-size: .8rem; color: var(--ink-2); margin: 10px 0 0; }
 </style>
 
 <div class="wrap">
@@ -223,6 +226,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     <div class="head-btns">
       <span class="example" id="exampleTag" hidden>サンプル物件の値を表示中（実在の物件ではありません）</span>
       <button class="btn ghost sm" type="button" id="sampleBtn">サンプル物件で試す</button>
+      <button class="btn ghost sm" type="button" id="genBtn">前提を一般値に戻す</button>
       <button class="btn ghost sm" type="button" id="clearBtn">入力をすべて消去</button>
     </div>
   </header>
@@ -336,6 +340,7 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
       <section class="card" aria-labelledby="h-need" id="needCard">
         <h2 id="h-need">入力データの状況 <small id="needSub"></small></h2>
         <div class="need-grid" id="needGrid"></div>
+        <p class="gen-list" id="genList"></p>
       </section>
 
       <section class="card" aria-labelledby="h-v" id="verdictCard">
@@ -518,6 +523,63 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     { key: "rent", name: "賃料", use: "賃料の適正", ids: ["mkt"] },
     { key: "bank", name: "銀行評価", use: "収益還元評価・融資見込み", ids: ["bLandBasis","bkLand","bkBldg","bkInc","bVac","bExp","bCap","bDisc","bRate","bDscr","bRatio","bMaxTerm","sellc"] },
   ];
+
+  // 一般的な前提値（物件の事実ではなく、個人の一棟投資で広く使われる目安）。値を書き換えると「一般値」の印が外れます。
+  const GENERAL = {
+    otherRate: { v: 4, note: "登記・取得税・融資手数料等で価格の3〜5%程度" },
+    vac: { v: 10, note: "空室・滞納で5〜10%程度を見込む例が多い（保守側の10%）" },
+    decl: { v: 1, note: "家賃は年0.5〜1%程度下落する前提が一般的（保守側の1%）" },
+    opex: { v: 15, note: "管理費5%＋修繕・保険・共用費などで実効収入の15%前後（固都税は別）" },
+    hold: { v: 10, note: "長期譲渡（6年目以降）となり、融資残高も減る10年が比較の基準" },
+    cap: { v: null, note: "購入時のNOI利回り＋0.5%（築年が進む分、利回りが上がる前提）" },
+    sellc: { v: 4, note: "仲介手数料3%＋6万円＋税と抵当権抹消費用等" },
+    repro: { v: null, note: "RC・SRC 20／重量鉄骨 18／軽量鉄骨・木造 15万円/㎡（構造に連動）" },
+    bLandBasis: { v: 1, note: "路線価を基準とする金融機関が多い" },
+    bkLand: { v: 80, note: "土地の担保掛目は70〜80%程度" },
+    bkBldg: { v: 70, note: "建物の担保掛目は60〜70%程度" },
+    bkInc: { v: 80, note: "収益評価の掛目は70〜80%程度" },
+    bVac: { v: 20, note: "金融機関の査定空室率は15〜20%程度" },
+    bExp: { v: 20, note: "金融機関の査定経費率は満室賃料の15〜25%程度" },
+    bCap: { v: 7, note: "地方中核都市の一棟物件で6〜8%程度。都心は4〜5%、地方は8%以上" },
+    bDisc: { v: 6.5, note: "還元利回り−0.5%程度" },
+    bRate: { v: 4, note: "審査金利（ストレス金利）は3.5〜4.5%程度" },
+    bDscr: { v: 1.2, note: "必要DSCRは1.2〜1.3倍程度" },
+    bRatio: { v: 50, note: "返済比率（返済額÷満室賃料）の上限は50%前後" },
+    bMaxTerm: { v: 35, note: "融資期間の上限は30〜35年程度" },
+  };
+  const genMode = {}; // true の項目は一般値を表示中
+  const reproFor = (st) => (st === 47 ? 20 : st === 34 ? 18 : st > 0 ? 15 : NaN);
+  function setGeneral(k) {
+    genMode[k] = true;
+    const g = GENERAL[k];
+    if (g.v !== null) $(k).value = g.v;
+    else $(k).value = "";
+    markGeneral();
+  }
+  function markGeneral() {
+    Object.keys(GENERAL).forEach((k) => {
+      const box = $(k).closest(".in"), f = $(k).closest(".f");
+      box.classList.toggle("general", !!genMode[k]);
+      $(k).title = genMode[k] ? "一般値：" + GENERAL[k].note : "";
+      const lab = f && f.querySelector("label");
+      if (!lab) return;
+      let tag = lab.querySelector(".gtag");
+      if (genMode[k] && !tag) { tag = document.createElement("span"); tag.className = "gtag"; tag.textContent = "一般値"; lab.appendChild(tag); }
+      if (!genMode[k] && tag) tag.remove();
+    });
+  }
+  // 構造やNOIに連動する一般値を更新
+  function syncGeneral(p) {
+    if (genMode.repro) { const v = reproFor(p.struct); $("repro").value = fin(v) ? v : ""; p.repro = v; }
+    if (genMode.cap) {
+      const st = missing(Object.assign({}, p, { cap: 1 }));
+      if (st.ok.core) {
+        const a0 = analyze(Object.assign({}, p, { cap: 1 }));
+        const v = Math.round((a0.y1.noi / p.price * 100 + 0.5) * 10) / 10;
+        if (fin(v) && v > 0) { $("cap").value = v.toFixed(1); p.cap = v; }
+      } else { $("cap").value = ""; p.cap = NaN; }
+    }
+  }
 
   const SAMPLE = {
     pname: "サンプル 〇〇町RCマンション", addr: "大阪府箕面市（サンプル）", isNew: false,
@@ -816,6 +878,8 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     if (p.isNew) add("info", "新築は売主物件のため仲介手数料は不要です。新築時の家賃は数年で下がりやすいため、家賃下落率の根拠を確認してください。");
     if (p.isNew === false && p.age >= a.legal) add("warn", `<b>法定耐用年数を経過した物件です。</b>償却は${a.lifeS}年で終わり、融資期間も短くなりがちです。`);
     extNotes.forEach((t) => add("warn", `<b>資料記載：</b>${esc(t)}`));
+    const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
+    if (gens.length) add("info", `<b>一般値で計算している前提：</b>${gens.map((k) => LABEL[k]).join("・")}。物件の実態や金融機関の基準が分かれば置き換えてください。`);
     const lackGroups = GROUPS.filter((g) => !a.ok[g.key]).map((g) => g.name);
     if (lackGroups.length) add("info", `<b>データ不足で判定していない分野：</b>${lackGroups.join("・")}。判定はこれらを含みません。`);
     const order = { bad: 0, warn: 1, info: 2, ok: 3 };
@@ -1006,11 +1070,14 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     }));
     NUM.forEach((k) => { const box = $(k).closest(".in"); if (box) box.classList.toggle("missing", missIds.has(k)); });
     $("kindSeg").style.outline = p.isNew === null ? "1.5px dashed var(--warn)" : "";
+    const gens = Object.keys(GENERAL).filter((k) => genMode[k]);
+    $("genList").innerHTML = gens.length ? `<b>一般値を入れている前提（${gens.length}項目）：</b>` + gens.map((k) => `${LABEL[k]} ${$(k).value !== "" ? esc($(k).tagName === "SELECT" ? $(k).selectedOptions[0].text : $(k).value) : "（" + (k === "cap" ? "基本の収支が揃うと自動計算" : "構造を選ぶと自動設定") + "）"}`).join("、") + "。入力欄の「一般値」の印は、値を書き換えると外れます。各値の根拠は入力欄にカーソルを合わせると表示されます。" : "";
   }
 
   let current = null;
   function render() {
     const p = read();
+    syncGeneral(p);
     const st = missing(p);
     renderNeed(st, p);
     $("propLabel").textContent = [p.pname, p.addr].filter(Boolean).join("／");
@@ -1255,7 +1322,10 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
     roll = Array.isArray(p.roll) ? p.roll.map((r) => Object.assign({}, r)) : [];
     setKind(p.isNew === true ? true : p.isNew === false ? false : null);
     document.querySelectorAll(".in.filled").forEach((x) => x.classList.remove("filled"));
+    Object.keys(GENERAL).forEach((k) => { genMode[k] = false; });
+    markGeneral();
   }
+  function applyGeneral() { Object.keys(GENERAL).forEach(setGeneral); }
   function setKind(n) {
     isNew = n;
     $("kNew").setAttribute("aria-pressed", String(n === true));
@@ -1266,12 +1336,13 @@ details.src td:last-child { white-space: normal; font-family: var(--f-body); col
 
   // ---------- イベント ----------
   function onEdit() { render(); }
-  NUM.concat(TXT).forEach((k) => { $(k).addEventListener("input", onEdit); });
+  NUM.concat(TXT).forEach((k) => { $(k).addEventListener("input", () => { if (genMode[k]) { genMode[k] = false; markGeneral(); } onEdit(); }); });
+  $("genBtn").addEventListener("click", () => { applyGeneral(); render(); });
   $("kNew").addEventListener("click", () => { setKind(true); onEdit(); });
   $("kUsed").addEventListener("click", () => { setKind(false); onEdit(); });
   $("sampleBtn").addEventListener("click", () => { apply(SAMPLE); srcMap = {}; extNotes = []; $("found").innerHTML = ""; $("srcBox").hidden = true; $("exampleTag").hidden = false; render(); });
   $("clearBtn").addEventListener("click", () => {
-    apply({}); srcMap = {}; extNotes = []; files = []; renderFiles(); $("paste").value = "";
+    apply({}); applyGeneral(); srcMap = {}; extNotes = []; files = []; renderFiles(); $("paste").value = "";
     $("found").innerHTML = ""; $("srcBox").hidden = true; $("exampleTag").hidden = true; $("memo").textContent = "";
     status("ファイルを選ぶか、テキストを貼り付けてください。"); render();
   });
@@ -1575,6 +1646,7 @@ JSONオブジェクト1つだけで答える：
       `総合スコア${fin(sc.total) ? sc.total + "点（" + sc.grade + "）" : "なし"}、採点${sc.nScored}/${sc.nItems}項目`,
       "自動チェックの指摘：" + j.al.map((x) => x.t.replace(/<[^>]+>/g, "")).join(" / "),
       lack.length ? `データ不足の分野：${lack.join("／")}` : "",
+      (() => { const g = Object.keys(GENERAL).filter((k) => genMode[k]); return g.length ? `一般値（目安）で置いている前提：${g.map((k) => `${LABEL[k]}=${$(k).value}`).join("、")}` : ""; })(),
     ].filter(Boolean).join("\n");
     try {
       const { text } = await sampleFn(`あなたは個人投資家の立場に立つ、収益不動産の投資アドバイザーです。次の試算結果だけをもとに、購入判断のための所見を日本語で書いてください。
@@ -1592,6 +1664,7 @@ ${facts}`, { signal: (ctl = new AbortController()).signal, onText: ({ text }) =>
   });
 
   // ---------- 起動 ----------
+  applyGeneral();
   render();
   (async () => {
     try {
